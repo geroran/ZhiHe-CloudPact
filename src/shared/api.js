@@ -96,25 +96,30 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
         try {
           payload = JSON.parse(text);
         } catch {
-          return failure('BAD_RESPONSE', `智能体服务返回非 JSON 响应（HTTP ${response.status}）。`, true);
+          payload = null;
         }
       }
 
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          return failure('UNAUTHORIZED', '智能体接口鉴权失败，请检查本地 Apikey 配置。');
+        if (transport === 'proxy' && payload && typeof payload.ok === 'boolean' && payload.error) {
+          return payload;
         }
-        if (response.status === 429) {
-          return failure('RATE_LIMITED', '智能体接口请求过于频繁，请稍后重试。', true);
-        }
-        if (response.status >= 500) {
-          return failure('UPSTREAM_ERROR', `智能体服务返回错误（HTTP ${response.status}）。`, true);
-        }
-        return failure('HTTP_ERROR', `智能体接口请求失败（HTTP ${response.status}）。`, true);
+        return mapStatus(response.status);
       }
 
       if (payload === null) {
-        return failure('BAD_RESPONSE', '智能体服务返回空响应。', true);
+        return failure('BAD_RESPONSE', `智能体服务返回非 JSON 响应（HTTP ${response.status}）。`, true);
+      }
+
+      // 代理模式必须返回 { ok, data } 或 { ok:false, error } 信封。
+      if (transport === 'proxy') {
+        if (typeof payload.ok !== 'boolean') {
+          return failure('BAD_RESPONSE', '本地代理返回了非信封响应。');
+        }
+        if (payload.ok === false) {
+          return payload.error ? payload : failure('BAD_RESPONSE', '本地代理返回了错误响应。');
+        }
+        return { ok: true, data: payload.data };
       }
 
       return { ok: true, data: payload };
