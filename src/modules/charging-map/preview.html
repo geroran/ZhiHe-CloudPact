@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桦苑充电口导航 · 模块预览</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #f5f7fb;
+        font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="charging-map-root"></div>
+    <script type="module">
+      import { mount } from "./index.js";
+
+      const params = new URLSearchParams(window.location.search);
+      const apiBase = params.get("apiBase") || "http://127.0.0.1:8011";
+
+      window.chargingMapUnmount = mount(document.getElementById("charging-map-root"), {
+        apiBase,
+      });
+    </script>
+  </body>
+</html>
