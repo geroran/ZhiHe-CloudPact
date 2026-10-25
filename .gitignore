@@ -1,0 +1,31 @@
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# Local secrets and per-machine configuration
+.env
+.env.*
+!.env.example
+*.local
+config.local.js
+credentials.local.*
+secrets.local.*
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local databases, logs, and editor files
+*.sqlite
+*.sqlite3
+*.db
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+plan/
