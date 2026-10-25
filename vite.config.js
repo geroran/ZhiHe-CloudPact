@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
         ...dreamProxy,
         '/hiagent': { target: 'https://agent-server.ynu.edu.cn', changeOrigin: true },
         '/api/term-courses': { target: termCoursesTarget, changeOrigin: true },
+        '/api/course-grades': { target: termCoursesTarget, changeOrigin: true },
         '/api': 'http://127.0.0.1:8787',
       },
     },

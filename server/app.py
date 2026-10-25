@@ -7,6 +7,7 @@
 - `POST /api/chat`
 - `GET  /api/charging/ports`（桦苑充电口，经服务端代理）
 - `GET  /api/term-courses`（学期课程列表，经服务端代理，凭据不下发浏览器）
+- `POST /api/course-grades/search|info`（课程检索与历史给分统计，经服务端代理）
 
 启动：`python server/app.py`（默认读取 `.env` 与 APP_PORT，默认 8091）。
 所有接口统一返回 `{ok:true,data}` / `{ok:false,error}`，并带 `Cache-Control: no-store`。
@@ -29,6 +30,14 @@ for _path in (str(ROOT_DIR), str(SERVER_DIR)):
         sys.path.insert(0, _path)
 
 from server.charging_core import query_status  # noqa: E402
+from server.course_grades_core import (  # noqa: E402
+    fetch_grade,
+    fetch_search,
+    interpret_grade,
+    interpret_search,
+    parse_info_payload,
+    parse_search_payload,
+)
 from server.config import Config, config_from_env  # noqa: E402
 from server.market_agent import ChatService, MarketApiError, build_market_service  # noqa: E402
 from server.market_service import MarketProviderError, MarketService, MarketUnavailable  # noqa: E402
@@ -215,6 +224,12 @@ def make_handler(config: Config, service: ChatService, static_root: Path | None 
             if parts.path == "/api/schedule/recognize":
                 self._schedule_recognize()
                 return
+            if parts.path == "/api/course-grades/search":
+                self._course_grades("search")
+                return
+            if parts.path == "/api/course-grades/info":
+                self._course_grades("info")
+                return
             if parts.path != "/api/chat":
                 self.send_json(404, error_payload("NOT_FOUND", "请求路径不存在"))
                 return
@@ -231,6 +246,52 @@ def make_handler(config: Config, service: ChatService, static_root: Path | None 
                 self.send_json(
                     500, error_payload("INTERNAL_ERROR", "服务内部错误", True)
                 )
+
+        def _course_grades(self, kind: str) -> None:
+            """课程检索 / 历史给分统计：凭据只留在服务端，只回传白名单字段。"""
+            payload = self._read_json_body()
+            if payload is None:
+                return
+
+            try:
+                if kind == "search":
+                    course_name, teacher, page = parse_search_payload(payload)
+                    call = lambda token: fetch_search(course_name, teacher, page, token)  # noqa: E731
+                    interpret = interpret_search
+                else:
+                    course_name, teacher = parse_info_payload(payload)
+                    call = lambda token: fetch_grade(course_name, teacher, token)  # noqa: E731
+                    interpret = interpret_grade
+            except ValueError as exc:
+                self.send_json(400, api_error("INVALID_REQUEST", str(exc)))
+                return
+
+            token = load_token(DEFAULT_CONFIG_PATH)
+            if not token:
+                self.send_json(
+                    503,
+                    api_error(
+                        "NOT_CONFIGURED",
+                        "服务端未配置课程查询凭证（WECAMPUS_TOKEN），请在 .env.local 或环境变量中配置。",
+                    ),
+                )
+                return
+
+            try:
+                status, upstream = call(token)
+            except UpstreamTimeout:
+                self.send_json(
+                    504, api_error("UPSTREAM_TIMEOUT", "课程接口响应超时，请稍后重试", True)
+                )
+                return
+            except UpstreamUnavailable:
+                self.send_json(
+                    502, api_error("UPSTREAM_ERROR", "无法连接校园课程接口，请稍后重试", True)
+                )
+                return
+
+            api_status, body = interpret(status, upstream)
+            self.send_json(api_status, body)
 
         def _term_courses(self, params: dict) -> None:
             """学期课程列表：由服务端注入 WECAMPUS_TOKEN，只回传课程字段白名单。"""
