@@ -20,6 +20,7 @@ import {
   hasValue,
   DETAIL_ROWS,
 } from './ui.js';
+import { progressLabel, classifyRefreshResult, filterItems } from './logic.js';
 
 export const manifest = Object.freeze({
   id: 'dreamspace-events',
@@ -31,24 +32,12 @@ export const manifest = Object.freeze({
 const POLL_INTERVAL_MS = 1500;
 const REFRESH_TIMEOUT_MS = 120000;
 const DATE_DETAIL_KEYS = new Set(['joindate', 'startdate', 'startdateDate', 'enddate']);
-const PHASE_LABELS = { list: '读取活动列表', details: '补充活动详情' };
+const LOGIN_FORM_COPY = '密码只提交给同源的 dream-monitor 后端；本页不保存密码、上游 token 或签名，仅使用 HttpOnly 会话 Cookie。';
 
 const emptyDetail = () => ({ aid: null, loading: false, data: null, error: null });
 
 function isAbort(error) {
   return error?.name === 'AbortError';
-}
-
-function progressText(progress) {
-  if (!progress || typeof progress !== 'object') return '';
-  const phase = hasValue(progress.phase) ? PHASE_LABELS[String(progress.phase)] || String(progress.phase) : '';
-  const done = Number.isFinite(progress.done) ? progress.done : null;
-  const total = Number.isFinite(progress.total) ? progress.total : null;
-  if (done !== null && total !== null && total > 0) {
-    return `${phase ? `${phase}，` : ''}已完成 ${done}/${total}`;
-  }
-  if (done !== null) return `${phase ? `${phase}，` : ''}已完成 ${done}`;
-  return phase;
 }
 
 function rangeText(label, start, end) {
@@ -87,6 +76,7 @@ export function mount(root, context = {}) {
     banner: null,
     filter: { query: '', status: 'all' },
     refreshing: false,
+    refreshBaseline: null,
     detail: emptyDetail(),
   };
 
@@ -175,7 +165,12 @@ export function mount(root, context = {}) {
       store.startupError = null;
       store.loginMessage = '';
       render();
-      if (store.snapshot?.busy && !pollTimer) startPolling();
+      if (store.snapshot?.busy && !pollTimer) {
+        if (store.refreshBaseline === null) {
+          store.refreshBaseline = Number.isFinite(store.snapshot.last_sync) ? store.snapshot.last_sync : null;
+        }
+        startPolling();
+      }
     } catch (error) {
       if (disposed || isAbort(error)) return;
       if (error.code === 'backend_token_leak') {
@@ -308,24 +303,60 @@ export function mount(root, context = {}) {
   }
 
   async function handleLogout() {
+    const button = ui?.logoutButton;
+    if (button) {
+      button.disabled = true;
+      button.textContent = '退出中…';
+    }
     try {
       await api.logout();
     } catch (error) {
-      if (isAbort(error) || disposed) return;
-      // 后端不可达时仍然清理本地界面，避免继续展示旧会话数据。
+      if (disposed || isAbort(error)) return;
+      // 退出请求失败时不能只清空界面就宣称服务端已退出。
+      if (button) {
+        button.disabled = false;
+        button.textContent = '退出登录';
+      }
+      store.banner = {
+        kind: 'error',
+        text: `退出失败：${error.message}。服务端会话可能仍然有效，请重试或关闭浏览器。`,
+      };
+      renderBanner();
+      return;
     }
     if (disposed) return;
+
+    // 退出后确认服务端会话确实失效：/api/me 应返回 401。
+    let verify = 'ok';
+    try {
+      const me = await api.me(controller.signal);
+      if (disposed) return;
+      if (me && typeof me === 'object' && hasValue(me.uid)) verify = 'alive';
+    } catch (error) {
+      if (disposed || isAbort(error)) return;
+      verify = error?.needLogin ? 'ok' : 'unknown';
+    }
+
     store.me = null;
     store.snapshot = null;
     store.banner = null;
     store.filter = { query: '', status: 'all' };
+    store.refreshBaseline = null;
     store.detail = emptyDetail();
-    enterLogin('已退出登录。');
+
+    if (verify === 'ok') {
+      enterLogin('已退出登录，服务端会话已失效。', 'info');
+    } else if (verify === 'alive') {
+      enterLogin('退出请求已完成，但服务端仍返回有效会话；请稍后重试退出。', 'error');
+    } else {
+      enterLogin('已发送退出请求，但未能确认服务端会话状态；如仍能看到活动，请重新退出。', 'error');
+    }
   }
 
   async function handleRefresh() {
     if (store.refreshing || store.snapshot?.busy) return;
     store.refreshing = true;
+    store.refreshBaseline = Number.isFinite(store.snapshot?.last_sync) ? store.snapshot.last_sync : null;
     store.banner = null;
     renderBanner();
     renderControls();
@@ -391,7 +422,26 @@ export function mount(root, context = {}) {
       if (!snapshot.busy) {
         stopPolling();
         store.refreshing = false;
-        store.banner = { kind: 'success', text: '活动列表已同步。' };
+        // busy=false 只代表后台线程结束，任务本身可能失败；用 last_sync 是否推进来判断。
+        const outcome = classifyRefreshResult(store.refreshBaseline, snapshot);
+        if (outcome.status === 'done') {
+          store.banner = { kind: 'success', text: '活动列表已同步。' };
+        } else if (outcome.status === 'partial') {
+          store.banner = {
+            kind: 'warn',
+            text: `已同步，但 ${outcome.unknown} 条活动的名额/详情暂未读取完成；可稍后再次刷新。`,
+          };
+        } else if (Number.isFinite(outcome.lastSync)) {
+          store.banner = {
+            kind: 'error',
+            text: `本次同步未成功，页面仍显示 ${formatSyncTime(outcome.lastSync)} 的旧数据；可重试刷新。`,
+          };
+        } else {
+          store.banner = {
+            kind: 'error',
+            text: '本次同步未成功，服务端尚未返回有效的同步时间；可重试刷新。',
+          };
+        }
       } else {
         store.banner = null;
       }
@@ -549,7 +599,7 @@ export function mount(root, context = {}) {
       el('button', { className: 'dse-btn', attrs: { type: 'submit' }, text: '登录' }),
       el('p', {
         className: 'dse-hint',
-        text: '密码只提交给同源的 dream-monitor 后端；本页不保存密码、上游 token 或签名，仅使用 HttpOnly 会话 Cookie。',
+        text: LOGIN_FORM_COPY,
       }),
     ]);
 
@@ -599,9 +649,10 @@ export function mount(root, context = {}) {
 
   function renderUnavailable() {
     statePanel(
-      '未接入 dream-monitor',
-      '当前运行环境无法访问同源的 dream-monitor 网页 API（/api/me 不可达）。本模块只在服务已部署且可从当前页面访问时启用，不会用静态数据冒充活动结果。',
-      store.startupError
+      '活动服务暂不可用',
+      '当前运行环境无法访问同源的 dream-monitor 网页 API（/api/me 连接失败、超时或不是 JSON）。请确认后端已启动、DREAM_MONITOR_TARGET 配置正确后重试。本模块不会用静态数据冒充活动结果。',
+      store.startupError,
+      '重试连接'
     );
   }
 
@@ -731,14 +782,14 @@ export function mount(root, context = {}) {
     const snapshot = store.snapshot;
     if (!snapshot) return null;
     if (snapshot.busy) {
-      const progress = progressText(snapshot.progress);
+      const progress = progressLabel(snapshot.progress);
       return {
         kind: 'info',
         text: `正在同步活动列表…${progress ? ` ${progress}` : ''}`,
       };
     }
     if (snapshot.enriching) {
-      const progress = progressText(snapshot.progress);
+      const progress = progressLabel(snapshot.progress);
       return {
         kind: 'info',
         text: `正在补充活动详情…${progress ? ` ${progress}` : ''}`,
@@ -867,18 +918,7 @@ export function mount(root, context = {}) {
     if (!ui?.list) return;
     const snapshot = store.snapshot || {};
     const items = Array.isArray(snapshot.items) ? snapshot.items : [];
-    const query = store.filter.query.trim().toLowerCase();
-    const statusFilter = store.filter.status;
-
-    const filtered = items.filter((item) => {
-      if (statusFilter !== 'all' && String(item.state) !== statusFilter) return false;
-      if (!query) return true;
-      const haystack = [item.name, item.category, item.organizer, item.address]
-        .filter(hasValue)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(query);
-    });
+    const filtered = filterItems(items, store.filter);
 
     const summary = [];
     summary.push(`共 ${items.length} 条未结束活动`);

@@ -29,6 +29,9 @@ const NEED_LOGIN_CODES = new Set([
   'auth_required',
 ]);
 
+/** 默认超时：避免后端未响应时页面一直停在“连接中”。 */
+export const DEFAULT_TIMEOUT_MS = 20000;
+
 function looksLikeNeedLogin(code, status, payload) {
   return (
     status === 401 ||
@@ -50,51 +53,76 @@ function httpMessage(payload, status) {
  * 与 dream-monitor 的 `/api/*` 契约不兼容。dream-monitor 必须与网页同源部署
  * （开发期由 Vite 代理，生产由同域反向代理），Cookie 才能以 HttpOnly + SameSite 生效。
  */
-async function rawRequest(path, options = {}) {
-  const { method = 'GET', body, signal } = options;
-  let response;
-  try {
-    response = await fetch(path, {
-      method,
-      credentials: 'same-origin',
-      cache: 'no-store',
-      signal,
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch (error) {
-    if (error?.name === 'AbortError') throw error;
-    throw new DreamApiError('无法连接 dream-monitor 服务', {
-      code: 'not_connected',
-      retryable: true,
-    });
+export async function rawRequest(path, options = {}) {
+  const { method = 'GET', body, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const forwardAbort = () => controller.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) controller.abort(signal.reason);
+    else signal.addEventListener('abort', forwardAbort, { once: true });
   }
 
-  const text = await response.text();
-  let payload = null;
-  if (text) {
+  try {
+    let response;
     try {
-      payload = JSON.parse(text);
-    } catch {
-      // 同源路径没有 JSON 响应，通常是服务未部署或被打包器回退成 HTML。
-      throw new DreamApiError('未检测到 dream-monitor 同源 API（响应不是 JSON）', {
+      response = await fetch(path, {
+        method,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        if (timedOut) {
+          throw new DreamApiError('dream-monitor 响应超时，请稍后重试', {
+            code: 'timeout',
+            retryable: true,
+          });
+        }
+        throw error;
+      }
+      throw new DreamApiError('无法连接 dream-monitor 服务', {
         code: 'not_connected',
-        status: response.status,
         retryable: true,
       });
     }
-  }
 
-  if (!response.ok) {
-    throw new DreamApiError(httpMessage(payload, response.status), {
-      code: `http_${response.status}`,
-      status: response.status,
-      retryable: response.status >= 500 || response.status === 429,
-      needLogin: looksLikeNeedLogin('', response.status, payload),
-    });
-  }
+    const text = await response.text();
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        // 同源路径没有 JSON 响应，通常是服务未部署或被打包器回退成 HTML。
+        throw new DreamApiError('未检测到 dream-monitor 同源 API（响应不是 JSON）', {
+          code: 'not_connected',
+          status: response.status,
+          retryable: true,
+        });
+      }
+    }
 
-  return payload;
+    if (!response.ok) {
+      throw new DreamApiError(httpMessage(payload, response.status), {
+        code: `http_${response.status}`,
+        status: response.status,
+        retryable: response.status >= 500 || response.status === 429,
+        needLogin: looksLikeNeedLogin('', response.status, payload),
+      });
+    }
+
+    return payload;
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', forwardAbort);
+  }
 }
 
 /**
@@ -146,7 +174,7 @@ export function createDreamApi() {
     },
 
     async state(signal) {
-      const snapshot = await call('/api/state', { method: 'GET' }, signal);
+      const snapshot = await call('/api/state', { method: 'GET', timeoutMs: 15000 }, signal);
       return assertNoUpstreamToken(snapshot);
     },
 

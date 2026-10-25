@@ -1,0 +1,82 @@
+api:
+  host: https://appdmkj.5idream.net
+  account: ''
+  password: ''
+  uid: ''
+  token: ''
+  jPushId: ''
+  version: 4.9.5
+  timeout: 20
+  request_delay: 1.2
+  auto_relogin: false
+poll_interval: 30
+page_size: 20
+# 并发抓取：页并发 / 详情并发。数字越大越快，但请求越密，风控概率上升
+page_workers: 4
+detail_workers: 4
+# 详情跨用户共享缓存（同一学校的人共用一份），单位秒
+detail_cache_path: data/shared_details.db
+detail_ttl: 900
+max_pages: 10
+notify_on_first_run: false
+dump_raw: false
+rules:
+  states:
+  - open
+  - full
+  - soon
+  require_quota: true
+  include: []
+  exclude: []
+  categories: []
+  organizers: []
+  min_hours_left: 1
+notify:
+  console:
+    enabled: true
+    beep: true
+  serverchan:
+    enabled: false
+    key: SCTxxxxxxxxxxxxxxxx
+  bark:
+    enabled: false
+    key: your-bark-key
+    server: https://api.day.app
+    level: timeSensitive
+    sound: bell
+  dingtalk:
+    enabled: false
+    webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
+  wecom:
+    enabled: false
+    webhook: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+  telegram:
+    enabled: false
+    bot_token: 123456:ABC-DEF
+    chat_id: '123456789'
+  email:
+    enabled: false
+    smtp_host: smtp.qq.com
+    smtp_port: 465
+    ssl: true
+    user: you@qq.com
+    password: 授权码不是登录密码
+    to:
+    - you@qq.com
+  webhook:
+    enabled: false
+    url: http://127.0.0.1:8080/dm-hook
+auto_signup:
+  enabled: false
+  only_ids: []
+  min_interval: 120
+  remark: ''
+db: data/dm.db
+status_map:
+  1: soon
+  2: soon
+  3: open
+  4: running
+  5: ended
+  6: ended
+  7: ended
