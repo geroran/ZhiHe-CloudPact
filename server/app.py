@@ -6,6 +6,7 @@
 - `GET  /api/market/posts|hot|search`
 - `POST /api/chat`
 - `GET  /api/charging/ports`（桦苑充电口，经服务端代理）
+- `GET  /api/term-courses`（学期课程列表，经服务端代理，凭据不下发浏览器）
 
 启动：`python server/app.py`（默认读取 `.env` 与 APP_PORT，默认 8091）。
 所有接口统一返回 `{ok:true,data}` / `{ok:false,error}`，并带 `Cache-Control: no-store`。
@@ -33,6 +34,16 @@ from server.market_agent import ChatService, MarketApiError, build_market_servic
 from server.market_service import MarketProviderError, MarketService, MarketUnavailable  # noqa: E402
 from server.model_client import ModelClient  # noqa: E402
 from server.schedule_core import recognize as recognize_schedule  # noqa: E402
+from server.term_courses_core import (  # noqa: E402
+    DEFAULT_CONFIG_PATH,
+    TERM_CODE_PATTERN,
+    UpstreamTimeout,
+    UpstreamUnavailable,
+    api_error,
+    fetch_upstream,
+    interpret_upstream,
+    load_token,
+)
 
 MAX_BODY_BYTES = 1024 * 1024
 SCHEDULE_MAX_BODY_BYTES = 20 * 1024 * 1024
@@ -163,6 +174,9 @@ def make_handler(config: Config, service: ChatService, static_root: Path | None 
             if path == "/api/charging/ports":
                 self.send_json(200, query_status())
                 return
+            if path == "/api/term-courses":
+                self._term_courses(params)
+                return
 
             if self._send_static(path):
                 return
@@ -217,6 +231,42 @@ def make_handler(config: Config, service: ChatService, static_root: Path | None 
                 self.send_json(
                     500, error_payload("INTERNAL_ERROR", "服务内部错误", True)
                 )
+
+        def _term_courses(self, params: dict) -> None:
+            """学期课程列表：由服务端注入 WECAMPUS_TOKEN，只回传课程字段白名单。"""
+            term_code = (params.get("termCode") or [""])[0].strip()
+            if not TERM_CODE_PATTERN.fullmatch(term_code):
+                self.send_json(
+                    400, api_error("INVALID_TERM_CODE", "请输入有效的学期代码，例如 2023-2024-1")
+                )
+                return
+
+            token = load_token(DEFAULT_CONFIG_PATH)
+            if not token:
+                self.send_json(
+                    503,
+                    api_error(
+                        "NOT_CONFIGURED",
+                        "服务端未配置课程查询凭证（WECAMPUS_TOKEN），请在 .env.local 或环境变量中配置。",
+                    ),
+                )
+                return
+
+            try:
+                status, payload = fetch_upstream(term_code, token)
+            except UpstreamTimeout:
+                self.send_json(
+                    504, api_error("UPSTREAM_TIMEOUT", "课程接口响应超时，请稍后重试", True)
+                )
+                return
+            except UpstreamUnavailable:
+                self.send_json(
+                    502, api_error("UPSTREAM_ERROR", "无法连接校园课程接口，请稍后重试", True)
+                )
+                return
+
+            api_status, body = interpret_upstream(status, payload)
+            self.send_json(api_status, body)
 
         def _schedule_recognize(self) -> None:
             payload = self._read_json_body(max_bytes=SCHEDULE_MAX_BODY_BYTES)

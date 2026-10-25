@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
   const dreamProxy = Object.fromEntries(
     DREAM_MONITOR_PATHS.map((path) => [path, { target: dreamTarget, changeOrigin: true }])
   );
+  // 学期课程由主站 Python 服务代理（WECAMPUS_TOKEN 只留在服务端）。
+  const termCoursesTarget = env.TERM_COURSES_TARGET || 'http://127.0.0.1:8011';
 
   return {
     base: './',
@@ -26,6 +28,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         ...dreamProxy,
         '/hiagent': { target: 'https://agent-server.ynu.edu.cn', changeOrigin: true },
+        '/api/term-courses': { target: termCoursesTarget, changeOrigin: true },
         '/api': 'http://127.0.0.1:8787',
       },
     },
