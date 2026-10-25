@@ -212,13 +212,30 @@ export function mount(root, context = {}) {
     } else if (!state.config) {
       nodes.marketStatus.classList.add('is-unknown');
       nodes.marketStatusText.textContent = '检测中…';
-    } else if (market?.available) {
+    } else if (market?.available && market.connected !== false && market.connected !== null) {
       nodes.marketStatus.classList.add('is-ok');
       nodes.marketStatusText.textContent = '真实数据源已连接';
+    } else if (market?.available) {
+      nodes.marketStatus.classList.add('is-warn');
+      nodes.marketStatusText.textContent = market?.message || '已配置数据源，检索时验证连接';
     } else {
       nodes.marketStatus.classList.add('is-warn');
       nodes.marketStatusText.textContent = market?.message || '真实数据源未配置/不可用';
     }
+  }
+
+  function updateMarketConnection(connected, message) {
+    if (!state.config) return;
+    state.config = {
+      ...state.config,
+      market: {
+        ...state.config.market,
+        available: state.config.market?.available !== false,
+        connected,
+        message,
+      },
+    };
+    renderStatus();
   }
 
   function renderConversations() {
@@ -553,6 +570,7 @@ export function mount(root, context = {}) {
           createdAt: Date.now(),
         });
         if (data.market) {
+          updateMarketConnection(true, '赞哦数据源已验证');
           state.browse = {
             status: 'success',
             mode: 'chat',
@@ -634,6 +652,7 @@ export function mount(root, context = {}) {
     if (!mounted) return;
 
     if (response.ok) {
+      updateMarketConnection(true, '赞哦数据源已验证');
       state.browse = {
         status: 'success',
         mode,
@@ -643,6 +662,10 @@ export function mount(root, context = {}) {
       };
       hideBanner();
     } else {
+      updateMarketConnection(
+        false,
+        response.error?.message || '最近一次集市检索失败，请重试',
+      );
       state.browse = {
         status: 'error',
         mode,

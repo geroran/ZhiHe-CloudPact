@@ -1,6 +1,6 @@
 """校园集市 Agent 的最小服务端配置。
 
-所有秘密（模型 API Key 等）只从服务端环境变量或本地 `.env` 读取，
+    所有秘密（模型 API Key、赞哦 Token 等）只从服务端环境变量或本地私有配置文件读取，
 不会返回给浏览器，也不会写入日志。
 """
 
@@ -34,6 +34,10 @@ class Config:
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
     market_provider: str = "disabled"
+    zanao_token: str = ""
+    zanao_school_alias: str = "scu"
+    zanao_search_category_id: str = "10"
+    market_timeout: float = 25.0
 
     @property
     def model_configured(self) -> bool:
@@ -80,6 +84,8 @@ def load_env_file(path: Path) -> None:
 
 
 def config_from_env() -> Config:
+    # 优先加载集市专用本地配置，随后加载通用 .env；已有进程环境变量仍优先。
+    load_env_file(ROOT_DIR / ".env.market")
     load_env_file(ROOT_DIR / ".env")
     return Config(
         app_name=os.getenv("APP_NAME", "校园集市 Agent"),
@@ -93,4 +99,8 @@ def config_from_env() -> Config:
         model_timeout=_read_float(os.getenv("MODEL_TIMEOUT"), 90.0),
         system_prompt=os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT) or DEFAULT_SYSTEM_PROMPT,
         market_provider=os.getenv("MARKET_PROVIDER", "disabled").strip().lower() or "disabled",
+        zanao_token=os.getenv("ZANAO_TOKEN", ""),
+        zanao_school_alias=os.getenv("ZANAO_SCHOOL_ALIAS", "scu").strip() or "scu",
+        zanao_search_category_id=os.getenv("ZANAO_SEARCH_CATEGORY_ID", "10").strip() or "10",
+        market_timeout=_read_float(os.getenv("MARKET_TIMEOUT"), 25.0),
     )

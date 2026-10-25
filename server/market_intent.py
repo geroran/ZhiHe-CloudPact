@@ -98,9 +98,11 @@ def extract_keyword(text: str) -> str:
     这是保守的规则处理：不猜测用户未表达的商品或条件。
     """
     keyword = (text or "").strip()
-    for prefix in _NOISE_PREFIXES:
-        if keyword.startswith(prefix):
-            keyword = keyword[len(prefix):].strip()
+    while keyword:
+        prefix = next((item for item in _NOISE_PREFIXES if keyword.startswith(item)), None)
+        if prefix is None:
+            break
+        keyword = keyword[len(prefix):].strip()
     for phrase in _NOISE_PHRASES:
         keyword = keyword.replace(phrase, " ")
     keyword = re.sub(r"[，。！？、；：,.!?;:（）()【】\[\]]", " ", keyword)

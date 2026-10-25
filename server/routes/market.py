@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from ..market_agent import ChatService, MarketApiError
-from ..market_service import MarketUnavailable
+from ..market_service import MarketProviderError, MarketUnavailable
 
 router = APIRouter(prefix="/api", tags=["market-agent"])
 
@@ -71,6 +71,8 @@ def market_posts(request: Request, service: ChatService = Depends(get_service)) 
         return _ok(service.market.latest(limit))
     except MarketApiError as exc:
         return _error(exc.status, exc.code, exc.message, exc.retryable)
+    except MarketProviderError as exc:
+        return _error(exc.status, exc.code, exc.message, exc.retryable)
     except MarketUnavailable:
         return _error(503, "MARKET_UNAVAILABLE", "真实数据源未配置/不可用")
     except ValueError as exc:
@@ -83,6 +85,8 @@ def market_hot(request: Request, service: ChatService = Depends(get_service)) ->
         limit = _int_param(request, "limit", 20)
         return _ok(service.market.hot(limit))
     except MarketApiError as exc:
+        return _error(exc.status, exc.code, exc.message, exc.retryable)
+    except MarketProviderError as exc:
         return _error(exc.status, exc.code, exc.message, exc.retryable)
     except MarketUnavailable:
         return _error(503, "MARKET_UNAVAILABLE", "真实数据源未配置/不可用")
@@ -100,6 +104,8 @@ def market_search(request: Request, service: ChatService = Depends(get_service))
         limit = _int_param(request, "limit", 20)
         return _ok(service.market.search(keyword, page, limit))
     except MarketApiError as exc:
+        return _error(exc.status, exc.code, exc.message, exc.retryable)
+    except MarketProviderError as exc:
         return _error(exc.status, exc.code, exc.message, exc.retryable)
     except MarketUnavailable:
         return _error(503, "MARKET_UNAVAILABLE", "真实数据源未配置/不可用")

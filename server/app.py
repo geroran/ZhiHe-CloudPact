@@ -30,7 +30,7 @@ for _path in (str(ROOT_DIR), str(SERVER_DIR)):
 from server.charging_core import query_status  # noqa: E402
 from server.config import Config, config_from_env  # noqa: E402
 from server.market_agent import ChatService, MarketApiError, build_market_service  # noqa: E402
-from server.market_service import MarketService, MarketUnavailable  # noqa: E402
+from server.market_service import MarketProviderError, MarketService, MarketUnavailable  # noqa: E402
 from server.model_client import ModelClient  # noqa: E402
 from server.schedule_core import recognize as recognize_schedule  # noqa: E402
 
@@ -267,6 +267,8 @@ def make_handler(config: Config, service: ChatService, static_root: Path | None 
             try:
                 self.send_json(200, ok_payload(call()))
             except MarketApiError as exc:
+                self.send_json(exc.status, error_payload(exc.code, exc.message, exc.retryable))
+            except MarketProviderError as exc:
                 self.send_json(exc.status, error_payload(exc.code, exc.message, exc.retryable))
             except MarketUnavailable:
                 self.send_json(

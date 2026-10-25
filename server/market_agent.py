@@ -12,7 +12,7 @@ import json
 
 from .config import Config, config_from_env
 from .market_intent import extract_keyword, is_market_query
-from .market_service import MarketService, MarketUnavailable, UnavailableProvider
+from .market_service import MarketProviderError, MarketService, MarketUnavailable, UnavailableProvider, ZanaoProvider
 from .model_client import ModelClient, ModelError
 
 MAX_MESSAGE_CHARS = 2_000
@@ -31,17 +31,22 @@ class MarketApiError(Exception):
 
 
 def build_market_service(config: Config) -> MarketService:
-    """构造只读市场服务。
-
-    当前没有任何确认可用的真实适配器。即使配置了 MARKET_PROVIDER=zanao，
-    也只显示“适配器未提供”，不会伪造帖子或回退 mock。
-    """
+    """构造只读市场服务；赞哦凭据缺失时明确保持不可用。"""
     if config.market_provider in ("", "disabled", "none"):
         return MarketService(UnavailableProvider())
+    if config.market_provider == "zanao" and config.zanao_token.strip():
+        return MarketService(
+            ZanaoProvider(
+                token=config.zanao_token,
+                school_alias=config.zanao_school_alias,
+                category_id=config.zanao_search_category_id,
+                timeout=config.market_timeout,
+            )
+        )
     return MarketService(
         UnavailableProvider(
             name=config.market_provider,
-            message="真实数据源适配器未提供/不可用",
+            message=("未配置赞哦 Token" if config.market_provider == "zanao" else "不支持的集市数据源"),
         )
     )
 
@@ -144,6 +149,8 @@ class ChatService:
             keyword = extract_keyword(message)
             try:
                 market_result = self.market.search(keyword, page=1, limit=MAX_MODEL_POSTS)
+            except MarketProviderError as exc:
+                raise MarketApiError(exc.status, exc.code, exc.message, exc.retryable) from None
             except MarketUnavailable:
                 raise MarketApiError(503, "MARKET_UNAVAILABLE", "真实数据源未配置/不可用") from None
             except ValueError as exc:

@@ -40,12 +40,29 @@
 
 ## 本地运行
 
-需要安装 Node.js 和 npm。进入项目目录后执行：
+校园集市 Agent 需要同时启动前端和 Python API。ZIP 中已验证可用的赞哦 Token 与模型配置保存在 Git 忽略的 `.env.market`；项目启动时会自动加载该文件。不要把真实凭据复制到 `.env.example`、前端变量或提交记录。
+
+首次运行，在项目目录执行：
 
 ```bash
 npm install
-npm run dev
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+分别在两个终端启动 API 和集市前端：
+
+```bash
+.venv\Scripts\python.exe server/app.py
+```
+
+```bash
+npm run dev:market
+```
+
+浏览器打开 `http://127.0.0.1:5300/market-agent.html`。API 默认监听 `127.0.0.1:8011`。`.env.market` 包含 `MARKET_PROVIDER`、`ZANAO_TOKEN`、学校别名、搜索分类、模型 API Key、模型地址及模型名；如果令牌失效，在此文件更新对应值后重启 API。
+
+主站仍可单独通过 `npm run dev` 启动；主站的其它校园服务不由集市 Agent 的本地端口代替。
 
 构建前端资源：
 
@@ -53,14 +70,29 @@ npm run dev
 npm run build
 ```
 
-`npm run dev` 启动 Vite 前端开发服务器。部分功能还依赖 Python 服务端或已部署的外部服务；如页面提示接口未配置或不可用，请检查 `.env.example` 中对应的配置项、服务地址、网络及登录状态。不要把个人凭据提交到代码仓库。
+`npm run dev` 启动主站 Vite 开发服务器。集市单模块联调使用 `npm run dev:market`，并确保 Python API 已启动。页面状态会区分凭据已配置、连接已验证和上游请求失败；若只显示已配置，先执行一次最新、热门或关键词检索来验证连接。
+
+### 到梦空间：本地真实后端
+
+到梦空间模块需要 `dream-monitor` 网页服务提供同源 `/api/*`。仓库已内置锁定版本的上游源码（`vendor/dream-monitor`）：
+
+```bash
+# 首次：安装后端依赖并生成本地配置（config.yaml 与 data/ 均被 Git 忽略）
+python -m pip install -r vendor/dream-monitor/requirements.txt
+copy vendor/dream-monitor/config.example.yaml vendor/dream-monitor/config.yaml
+
+npm run dev:dream-monitor   # 后端 127.0.0.1:8770
+npm run dev                 # 前端 127.0.0.1:8000
+```
+
+打开 `http://127.0.0.1:8000/#/dreamspace-events`，用**自己的**到梦空间账号登录。上游来源、锁定提交、二开补丁、数据目录与生产反向代理说明见 [vendor/dream-monitor/ZHIHEY-INTEGRATION.md](vendor/dream-monitor/ZHIHEY-INTEGRATION.md)。未启动后端时页面显示“活动服务暂不可用”，不会用模拟数据冒充结果。
 
 ## 数据与使用说明
 
 - 空教室、课程、充电和活动等结果受上游服务数据及可用性影响。
 - 学期课程接口提供的是课程信息，不代表成绩信息；项目不会据此推算成绩、学分或绩点。
 - 到梦空间模块为只读查询，不支持活动报名或取消报名。
-- 校园集市回答应以实际检索结果为依据；数据源不可用时不会生成虚构帖子。
+- 校园集市通过服务端只读适配器请求赞哦最新帖、热门帖和关键词检索；模型回答使用实际检索结果，数据源不可用时不会生成虚构帖子。
 - 请勿在公开分享的截图、页面或代码中展示个人账号、登录凭据或密钥。
 - 校园 AI 助手优先使用 `chat_query_v2` 的 SSE 流式回答；若上游或代理未提供流式响应，会自动回退为 blocking 请求，界面仍可正常显示回答。模型返回的推理过程与工具消息不会展示，接口失败时不会编造回答。
 - 如需浏览器直连模式（`VITE_AGENT_TRANSPORT=direct`），AppID 与 Apikey 会出现在前端构建产物和浏览器开发者工具中，仅限封闭演示环境使用；正式部署请改用同源代理模式，把凭据保留在服务端。
