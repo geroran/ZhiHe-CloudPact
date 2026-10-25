@@ -1,0 +1,32 @@
+[Unit]
+Description=ZhiHeYunQi %i service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhihe
+Group=zhihe
+WorkingDirectory=/opt/zhihe-yunqi
+Environment=PYTHONUNBUFFERED=1
+Environment=APP_HOST=127.0.0.1
+Environment=APP_PORT=8011
+Environment=HOST=127.0.0.1
+Environment=PORT=8788
+Environment=COURSE_API_HOST=127.0.0.1
+Environment=COURSE_API_PORT=8787
+Environment=AGENT_TRANSPORT=proxy
+Environment=EHALL_PROXY=
+Environment=DM_COOKIE_SECURE=1
+ExecStart=/bin/bash /opt/zhihe-yunqi/deploy/start-service.sh %i
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/zhihe-yunqi/vendor/dream-monitor
+
+[Install]
+WantedBy=multi-user.target
