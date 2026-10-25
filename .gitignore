@@ -2,6 +2,8 @@
 node_modules/
 dist/
 coverage/
+.vite/
+.tmp-preview-*
 
 # Local secrets and per-machine configuration
 .env
