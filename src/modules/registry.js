@@ -17,6 +17,8 @@ const icons = {
     '<path d="M6 21V4"/><path d="M6 4h11l-1.6 4L17 12H6"/><path d="M9 8l1.2 1.2L13 6.5"/>',
   sparkle:
     '<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z"/><path d="M18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/>',
+  grades:
+    '<path d="M4 20h16"/><path d="M7 20v-7"/><path d="M12 20V6"/><path d="M17 20v-4"/><path d="M5 6l4-3 3 3 5-4"/>',
   calendarBus:
     '<rect x="4" y="4" width="16" height="12" rx="2.5"/><path d="M4 10h16"/><path d="M8 16v3M16 16v3"/><circle cx="8" cy="13" r="1"/><circle cx="16" cy="13" r="1"/>',
 };
@@ -81,6 +83,16 @@ export const modules = [
     tone: 'green',
     icon: icons.term,
     load: () => import('./term-course-list/index.js'),
+  },
+  {
+    id: 'course-grades',
+    path: '/course-grades',
+    title: '课程给分',
+    short: '平均分 · 分数段',
+    description: '按课程名或教师查询历史平均分、最高分与分数段分布。',
+    tone: 'coral',
+    icon: icons.grades,
+    load: () => import('./course-grades/index.js'),
   },
   {
     id: 'campus-calendar',
