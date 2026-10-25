@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>到梦空间模块 · dream-monitor 契约测试</title>
+  <style>
+    :root { --brand: #2b3f81; }
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      color: #1f2430;
+      font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    .harness-bar {
+      background: #fff;
+      border-bottom: 1px solid #dfe4ef;
+      padding: 10px 16px;
+    }
+    .harness-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      font-size: 13px; color: #5b6475;
+    }
+    .harness-inner strong { color: #1f2430; }
+    .harness-inner button {
+      border: 1px solid #dfe4ef; background: #fff; color: #2b3f81;
+      border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit;
+    }
+    .harness-note {
+      margin-left: auto;
+      font-size: 12px; color: #7a5410; background: #fff7e6;
+      border: 1px solid #f2ddae; border-radius: 6px; padding: 3px 8px;
+    }
+    #module-root { display: block; padding: 20px 16px; }
+    #toast {
+      position: fixed; right: 16px; bottom: 16px; z-index: 20;
+      display: none; background: #1f2430; color: #fff;
+      padding: 8px 12px; border-radius: 8px; font-size: 13px;
+      max-width: 320px;
+    }
+  </style>
+</head>
+<body>
+  <div class="harness-bar">
+    <div class="harness-inner">
+      <strong>智启云聚 · 到梦空间模块测试页</strong>
+      <span>请求方式：<b>同源直连 /api/*</b></span>
+      <button type="button" id="btn-remount">卸载并重新挂载</button>
+      <button type="button" id="btn-unmount">卸载模块</button>
+      <span class="harness-note">仅测试桩数据，不是真实活动</span>
+    </div>
+  </div>
+
+  <div id="module-root"></div>
+  <div id="toast" role="status"></div>
+
+  <script type="module">
+    import { mount } from '/src/modules/dreamspace-events/index.js';
+
+    const root = document.getElementById('module-root');
+    const toast = document.getElementById('toast');
+
+    function notify(message) {
+      toast.textContent = String(message);
+      toast.style.display = 'block';
+      window.clearTimeout(notify.timer);
+      notify.timer = window.setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2400);
+    }
+
+    // 模块只用 context.notify；API 请求固定走同源 fetch，不再注入适配层。
+    const context = { notify, navigate() {} };
+
+    let cleanup = null;
+
+    function start() {
+      if (cleanup) {
+        cleanup();
+        cleanup = null;
+      }
+      cleanup = mount(root, context);
+      window.__dseHarness.mounted = true;
+    }
+
+    window.__dseHarness = {
+      mounted: false,
+      start,
+      stop() {
+        if (cleanup) cleanup();
+        cleanup = null;
+        this.mounted = false;
+      },
+    };
+
+    document.getElementById('btn-remount').addEventListener('click', start);
+    document.getElementById('btn-unmount').addEventListener('click', () => window.__dseHarness.stop());
+
+    start();
+  </script>
+</body>
+</html>

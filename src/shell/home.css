@@ -1,0 +1,383 @@
+.home {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  padding-bottom: 24px;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 20px 22px;
+  color: #fff;
+  background: linear-gradient(160deg, #2b3f81 0%, #2b3f81 42%, #3a54a0 100%);
+  border-radius: 0 0 26px 26px;
+}
+
+.hero__glow {
+  position: absolute;
+  top: -96px;
+  right: -84px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 68%);
+  pointer-events: none;
+}
+
+.hero__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  border-radius: 9px;
+  background: #2b3f81;
+}
+
+.hero__logo img {
+  height: 27px;
+  width: auto;
+}
+
+.hero__badge {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+}
+
+.hero__eyebrow {
+  position: relative;
+  margin: 22px 0 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9.5px;
+  letter-spacing: 0.24em;
+}
+
+.hero__title {
+  position: relative;
+  margin: 5px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+.hero__subtitle {
+  position: relative;
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.hero__ask {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  text-align: left;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.hero__ask:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hero__ask:active {
+  transform: scale(0.985);
+}
+
+.hero__ask-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hero__ask-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hero__ask-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hero__ask-copy strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.hero__ask-copy small {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero__ask-arrow {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero__ask-arrow svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hero__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 10.5px;
+}
+
+.hero__foot i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.home__main {
+  padding: 20px 16px 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.section-head span {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 118px;
+  padding: 14px 6px 12px;
+  border: 1px solid rgba(230, 234, 243, 0.9);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(43, 63, 129, 0.05);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(43, 63, 129, 0.16);
+  box-shadow: 0 12px 26px rgba(43, 63, 129, 0.1);
+}
+
+.tile:active {
+  transform: scale(0.975);
+}
+
+.tile__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+}
+
+.tile__icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.tile__name {
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.tile__hint {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.tile--teal .tile__icon {
+  background: #e6f6f3;
+  color: #0f8a7e;
+}
+
+.tile--amber .tile__icon {
+  background: #fff3df;
+  color: #b87313;
+}
+
+.tile--coral .tile__icon {
+  background: #ffecea;
+  color: #c0544b;
+}
+
+.tile--violet .tile__icon {
+  background: #f0ecff;
+  color: #6a4fc4;
+}
+
+.tile--green .tile__icon {
+  background: #eaf7e8;
+  color: #3f8a3a;
+}
+
+.tile--sky .tile__icon {
+  background: #e8f2ff;
+  color: #2b6cb8;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.note__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: #eef2fd;
+  color: var(--brand);
+}
+
+.note__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.note__body strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.note__body p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.foot {
+  margin-top: 24px;
+  padding: 0 4px 8px;
+  color: #9aa2b8;
+  font-size: 10.5px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.foot span {
+  display: block;
+  opacity: 0.82;
+}
+
+@media (min-width: 560px) {
+  .home {
+    min-height: calc(100vh - 48px);
+  }
+}
+
+@media (max-width: 380px) {
+  .hero {
+    padding: 16px 16px 20px;
+  }
+
+  .hero__title {
+    font-size: 26px;
+  }
+
+  .home__main {
+    padding: 18px 14px 0;
+  }
+
+  .tiles {
+    gap: 8px;
+  }
+
+  .tile {
+    min-height: 110px;
+    padding: 12px 4px 10px;
+  }
+
+  .tile__icon {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 7px;
+  }
+
+  .tile__name {
+    font-size: 12px;
+  }
+
+  .tile__hint {
+    font-size: 10px;
+  }
+}

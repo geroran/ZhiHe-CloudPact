@@ -1,0 +1,24 @@
+{
+  "name": "zhihe-yunqi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "智启云聚：云南大学校园信息与智能服务平台",
+  "scripts": {
+    "dev": "vite",
+    "dev:market": "vite --config src/dev/vite.market.config.js",
+    "dev:server": "python server/app.py",
+    "api:courses": "node server/index.js",
+    "test:courses": "node --test tests/course-utils.test.js tests/courses-route.test.js tests/teacher-course-api.test.js",
+    "test:ai": "node --test tests/parse.test.mjs tests/markdown.test.mjs tests/sse.test.mjs tests/user-id.test.mjs tests/api-client.test.mjs tests/agent-api.test.mjs tests/stream.test.mjs tests/server.test.mjs",
+    "test:market": "node --test tests/helpers.test.mjs && python -m unittest server.tests.test_api -v",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.1.0"
+  },
+  "dependencies": {
+    "undici": "^8.12.3"
+  }
+}

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>教师课程查询 · 模块联调</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --brand-primary: #2b3f81;
+      --bg-page: #f5f7fb;
+      --text-primary: #1f2430;
+      --text-secondary: #5b6478;
+      --border-color: #dde3ee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .dev-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 16px;
+      padding: 10px 16px;
+      background: #1f2f63;
+      color: #ffffff;
+      font-size: 0.85rem;
+    }
+    .dev-bar strong { font-weight: 600; }
+    .dev-bar span { opacity: 0.85; }
+    #app { max-width: 1200px; margin: 0 auto; padding: 20px 16px 32px; min-height: 70vh; }
+    footer {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 16px 32px;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+    footer code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #e9edf7;
+      color: var(--brand-primary);
+    }
+    #boot-error {
+      display: none;
+      max-width: 760px;
+      margin: 24px auto;
+      padding: 16px;
+      border: 1px solid #f2c9c6;
+      border-radius: 10px;
+      background: #fdf1f0;
+      color: #b3261e;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="dev-bar">
+    <strong>教师课程查询 · 模块联调预览</strong>
+    <span>真实教务接口 · 会话仅保留在服务端</span>
+  </div>
+
+  <main id="app"></main>
+  <div id="boot-error" role="alert"></div>
+
+  <footer>
+    <p>本页通过同源代理 <code>/api/courses</code> 读取真实教务数据；浏览器不接触教务 Cookie，页面也不会要求输入教务密码。</p>
+    <p>启动：<code>node server/index.js</code>（默认 8787，需配置 <code>EHALL_COOKIE</code>），再通过 Vite 访问此页。</p>
+  </footer>
+
+  <script type="module">
+    import { mount } from "/src/modules/teacher-course-search/index.js";
+
+    const app = document.getElementById("app");
+
+    try {
+      const unmount = mount(app, { notify: () => {} });
+      window.__teacherCourseSearchUnmount = unmount;
+    } catch (error) {
+      const box = document.getElementById("boot-error");
+      box.style.display = "block";
+      box.textContent = `模块加载失败：${error instanceof Error ? error.message : String(error)}`;
+    }
+  </script>
+</body>
+</html>
