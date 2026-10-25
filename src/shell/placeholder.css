@@ -64,6 +64,11 @@
   color: var(--brand);
 }
 
+.ph-icon--rose {
+  background: #ffeef3;
+  color: #b83d5c;
+}
+
 .ph-title {
   margin: 0;
   font-size: 19px;

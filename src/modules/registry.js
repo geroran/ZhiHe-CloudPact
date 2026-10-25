@@ -17,6 +17,8 @@ const icons = {
     '<path d="M6 21V4"/><path d="M6 4h11l-1.6 4L17 12H6"/><path d="M9 8l1.2 1.2L13 6.5"/>',
   sparkle:
     '<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z"/><path d="M18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/>',
+  calendarBus:
+    '<rect x="4" y="4" width="16" height="12" rx="2.5"/><path d="M4 10h16"/><path d="M8 16v3M16 16v3"/><circle cx="8" cy="13" r="1"/><circle cx="16" cy="13" r="1"/>',
 };
 
 export const modules = [
@@ -79,6 +81,16 @@ export const modules = [
     tone: 'green',
     icon: icons.term,
     load: () => import('./term-course-list/index.js'),
+  },
+  {
+    id: 'campus-calendar',
+    path: '/campus-calendar',
+    title: '校历与校车',
+    short: '学期校历 · 校车时刻',
+    description: '查看两个学期的校历安排与校车运行时间表。',
+    tone: 'rose',
+    icon: icons.calendarBus,
+    load: () => import('./campus-calendar/index.js'),
   },
   {
     id: 'dreamspace-events',

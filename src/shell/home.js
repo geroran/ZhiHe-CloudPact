@@ -58,7 +58,7 @@ export function renderHome({ navigate }) {
       <section class="services" aria-labelledby="services-title">
         <div class="section-head">
           <h2 id="services-title">校园服务</h2>
-          <span>6 个入口</span>
+          <span>${gridModules.length} 个入口</span>
         </div>
         <div class="tiles">
           ${gridModules.map(tileTemplate).join('')}

@@ -285,6 +285,11 @@
   color: #2b6cb8;
 }
 
+.tile--rose .tile__icon {
+  background: #ffeef3;
+  color: #b83d5c;
+}
+
 .note {
   display: flex;
   align-items: flex-start;
