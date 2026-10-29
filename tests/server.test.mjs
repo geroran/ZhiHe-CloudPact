@@ -27,7 +27,7 @@ function getFreePort() {
 function spawnNode(relativeScript, env) {
   return spawn(process.execPath, [relativeScript], {
     cwd: ROOT,
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, ...(env.PORT ? { AGENT_PROXY_PORT: env.PORT } : {}) },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 }
@@ -87,12 +87,12 @@ before(async () => {
 
   const appPort = await getFreePort();
   appProcess = spawnNode('server/dev-server.mjs', {
-    AGENT_TRANSPORT: 'proxy',
+    AGENT_TRANSPORT: 'direct',
     AGENT_ORIGIN: `http://127.0.0.1:${mockPort}`,
     AGENT_APP_ID: APP_ID,
     AGENT_API_KEY: API_KEY,
     AGENT_USER_ID: '',
-    AGENT_TIMEOUT_MS: '5000',
+    AGENT_TIMEOUT_MS: '200',
     HOST: '127.0.0.1',
     PORT: String(appPort)
   });
@@ -235,4 +235,39 @@ test('上游对 streaming 请求返回 JSON 时仍给出可解析信封', async 
   const body = await response.json();
   assert.equal(body.ok, true);
   assert.equal(body.data.answer, '模拟回答：NOSSE');
+});
+
+// 旧服务端模式值不应重新开放凭据下发。
+test('上游鉴权失败不返回含凭据的错误正文', async () => {
+  const response = await postEndpoint('chat_query_v2', { Query: 'AUTH_FAIL' });
+  assert.equal(response.status, 401);
+  const body = await response.json();
+  assert.equal(body.error.code, 'UNAUTHORIZED');
+  assert.equal(JSON.stringify(body).includes(API_KEY), false);
+});
+
+test('上游超时返回可重试错误', async () => {
+  const response = await postEndpoint('chat_query_v2', { Query: 'TIMEOUT' });
+  assert.equal(response.status, 504);
+  assert.equal((await response.json()).error.code, 'TIMEOUT');
+});
+
+test('上游流中断使客户端读取失败而非正常完成', async () => {
+  const response = await postEndpoint('chat_query_v2', { Query: 'BROKEN_STREAM' });
+  await assert.rejects(response.text());
+});
+
+test('未配置服务端凭据时返回 CONFIG_ERROR', async () => {
+  const port = await getFreePort();
+  const child = spawnNode('server/dev-server.mjs', {
+    AGENT_APP_ID: '', AGENT_API_KEY: '', PORT: String(port), HOST: '127.0.0.1'
+  });
+  child.stdout.resume();
+  child.stderr.resume();
+  try {
+    await waitForHttp(`http://127.0.0.1:${port}/runtime-config.js`);
+    const response = await fetch(`http://127.0.0.1:${port}/api/agent/create_conversation`, { method: 'POST', body: '{}' });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error.code, 'CONFIG_ERROR');
+  } finally { child.kill(); }
 });

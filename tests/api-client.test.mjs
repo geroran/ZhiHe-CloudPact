@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApiClient } from '../src/shared/api.js';
 
-const DIRECT_CONFIG = {
-  transport: 'direct',
+const PROXY_CONFIG = {
+  transport: 'proxy',
   origin: 'https://agent.example',
   appId: 'app-id-123',
   apiKey: 'secret-key-456',
@@ -16,26 +16,6 @@ function jsonResponse(body, options = {}) {
     headers: { 'content-type': options.contentType || 'application/json' }
   });
 }
-
-test('direct 模式使用真实上游地址并携带 Apikey', async () => {
-  let captured = null;
-  const api = createApiClient(DIRECT_CONFIG, async (url, init) => {
-    captured = { url, init };
-    return jsonResponse({ answer: '真实回答' });
-  });
-
-  const result = await api.request('chat_query_v2', { body: { Query: '你好' } });
-
-  assert.equal(
-    captured.url,
-    'https://agent.example/api/proxy/api/v1/chat_query_v2?appid=app-id-123'
-  );
-  assert.equal(captured.init.method, 'POST');
-  assert.equal(captured.init.headers.Apikey, 'secret-key-456');
-  assert.deepEqual(JSON.parse(captured.init.body), { Query: '你好' });
-  assert.equal(result.ok, true);
-  assert.equal(result.data.answer, '真实回答');
-});
 
 test('proxy 模式走同源路径且不携带凭据', async () => {
   let captured = null;
@@ -52,8 +32,8 @@ test('proxy 模式走同源路径且不携带凭据', async () => {
   assert.equal(result.data.answer, '代理回答');
 });
 
-test('direct 模式按 HTTP 状态映射鉴权失败且不泄漏凭据', async () => {
-  const api = createApiClient(DIRECT_CONFIG, async () => jsonResponse('unauthorized', { status: 401 }));
+test('proxy 模式按 HTTP 状态映射鉴权失败且不泄漏凭据', async () => {
+  const api = createApiClient(PROXY_CONFIG, async () => jsonResponse('unauthorized', { status: 401 }));
   const result = await api.request('chat_query_v2', { body: {} });
 
   assert.equal(result.ok, false);
@@ -65,7 +45,7 @@ test('direct 模式按 HTTP 状态映射鉴权失败且不泄漏凭据', async (
 });
 
 test('网络失败返回 NETWORK 且可重试', async () => {
-  const api = createApiClient(DIRECT_CONFIG, async () => {
+  const api = createApiClient(PROXY_CONFIG, async () => {
     throw new TypeError('fetch failed');
   });
   const result = await api.request('chat_query_v2', { body: {} });
@@ -75,7 +55,7 @@ test('网络失败返回 NETWORK 且可重试', async () => {
 });
 
 test('超过超时时间返回 TIMEOUT', async () => {
-  const api = createApiClient(DIRECT_CONFIG, (_url, init) => {
+  const api = createApiClient(PROXY_CONFIG, (_url, init) => {
     return new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => {
         reject(new DOMException('Aborted', 'AbortError'));
@@ -90,7 +70,7 @@ test('超过超时时间返回 TIMEOUT', async () => {
 
 test('外部取消返回 ABORTED', async () => {
   const controller = new AbortController();
-  const api = createApiClient(DIRECT_CONFIG, (_url, init) => {
+  const api = createApiClient(PROXY_CONFIG, (_url, init) => {
     return new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => {
         reject(new DOMException('Aborted', 'AbortError'));
@@ -105,9 +85,9 @@ test('外部取消返回 ABORTED', async () => {
   assert.equal(result.error.code, 'ABORTED');
 });
 
-test('direct 模式识别 SSE 并拒绝按 blocking JSON 解析', async () => {
+test('proxy 模式识别 SSE 并拒绝按 blocking JSON 解析', async () => {
   const sse = 'event:text\ndata: {"event":"message","answer":"x"}\n';
-  const api = createApiClient(DIRECT_CONFIG, async () =>
+  const api = createApiClient(PROXY_CONFIG, async () =>
     jsonResponse(sse, { contentType: 'text/event-stream' })
   );
   const result = await api.request('chat_query_v2', { body: {} });
@@ -135,4 +115,25 @@ test('proxy 模式拒绝非信封内容', async () => {
   const result = await api.request('chat_query_v2', { body: {} });
   assert.equal(result.ok, false);
   assert.equal(result.error.code, 'BAD_RESPONSE');
+});
+
+// 即使旧调用方传入凭据，客户端也只能请求本项目代理。
+test('旧直连配置不会将凭据带到网络请求', async () => {
+  const api = createApiClient({ transport: 'direct', origin: 'https://secret.test', appId: 'private-id', apiKey: 'private-key' }, async (url, init) => {
+    assert.equal(url, '/api/agent/chat_query_v2');
+    assert.equal(JSON.stringify(init).includes('private-'), false);
+    return jsonResponse({ ok: true, data: {} });
+  });
+  assert.equal((await api.request('chat_query_v2')).ok, true);
+});
+
+test('流式客户端使用同源路径且不携带配置中的凭据', async () => {
+  const api = createApiClient(PROXY_CONFIG, async (url, init) => {
+    assert.equal(url, '/api/agent/chat_query_v2');
+    assert.equal(init.headers.Apikey, undefined);
+    return new Response('data: {}\n\n', { headers: { 'content-type': 'text/event-stream' } });
+  });
+  const chunks = [];
+  assert.equal((await api.stream('chat_query_v2', { onText: text => chunks.push(text) })).ok, true);
+  assert.equal(chunks.join(''), 'data: {}\n\n');
 });

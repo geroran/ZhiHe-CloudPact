@@ -106,6 +106,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (path.endsWith('/chat_query_v2')) {
+    if (body.Query === 'AUTH_FAIL') {
+      sendJson(res, 401, { error: expectedApiKey });
+      return;
+    }
+    if (body.Query === 'TIMEOUT') {
+      const timer = setTimeout(() => sendJson(res, 200, {}), 10000);
+      res.on('close', () => clearTimeout(timer));
+      return;
+    }
+    if (body.Query === 'BROKEN_STREAM') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      res.write('event: message\ndata: {"answer":"partial"}\n\n');
+      setTimeout(() => res.destroy(), 30);
+      return;
+    }
     if (body.Query === 'FAIL') {
       sendJson(res, 500, { error: 'upstream failure' });
       return;

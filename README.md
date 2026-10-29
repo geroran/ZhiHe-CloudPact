@@ -70,7 +70,7 @@ flowchart TB
     Shell --> AI[校园 AI 助手]
     Shell --> Tools[空教室 / 充电 / 集市 / 课程 / 活动]
     Shell --> Assets[校历与校车静态资料]
-    AI --> Client[智能体客户端：direct / proxy]
+    AI --> Client[智能体客户端：同源代理]
     Client --> Agent[校园智能体服务]
     Tools --> Adapters[模块 API 适配与数据归一化]
     Adapters --> Hiagent[校园空教室服务]
@@ -197,7 +197,7 @@ AI 课表将截图识别与课表规则分开：前者提取课程字段，后�
 | 处理环节 | 当前做法 | 需要保留的边界 |
 | --- | --- | --- |
 | 服务端凭据 | 教务 Cookie、集市 Token、课程 Token 与模型密钥通过私有配置或环境变量读取 | 不提交真实值；不同服务的配置加载顺序不同，见运行说明 |
-| AI direct 模式 | 使用 `VITE_AGENT_*` 注入浏览器 | 凭据会进入构建产物与开发者工具；仅适合已接受该条件的封闭演示 |
+| AI 服务端代理 | 浏览器只访问 `/api/agent/*` | AppID / API Key 仅保留在服务端；旧直连配置不再支持 |
 | AI proxy 模式 | 客户端支持同源 `/api/agent/*`；仓库有代理实现 | 当前主站需接入代理服务与路由，不能只改一个环境变量便认为部署完成 |
 | 数据输出 | 部分接口使用字段白名单；模型文本先转义；错误信息结构化 | 上游内容和模型输出仍需按具体场景核对 |
 | 请求失败 | 超时、鉴权失效、空结果、网络错误分别反馈；充电失败按设备隔离 | 上游不可用时，不能保证对应实时功能可用 |
@@ -232,8 +232,8 @@ npm run dev
 
 | 服务 | 关键变量 | 配置读取方式 |
 | --- | --- | --- |
-| Vite 与 AI 浏览器直连 | `VITE_AGENT_TRANSPORT`、`VITE_AGENT_ORIGIN`、`VITE_AGENT_APP_ID`、`VITE_AGENT_API_KEY` | Vite 环境文件；`VITE_` 变量会进入前端 |
-| AI 服务端代理 | `AGENT_TRANSPORT`、`AGENT_ORIGIN`、`AGENT_APP_ID`、`AGENT_API_KEY` | 代理入口读取服务端配置；还需接入主站网关 |
+| Vite 与 AI 同源代理 | `VITE_AGENT_TRANSPORT=proxy`、`AGENT_PROXY_TARGET` | 默认转发到 `127.0.0.1:8788`；开发及构建均拒绝前端凭据变量 |
+| AI 服务端代理 | `AGENT_TRANSPORT`、`AGENT_ORIGIN`、`AGENT_APP_ID`、`AGENT_API_KEY` | Node 代理读取服务端配置；开发和部署入口均已配置路由 |
 | Python 主服务 | `APP_HOST`、`APP_PORT` | 进程环境优先；依次加载 `.env.market`、`.env`，不覆盖已有值 |
 | 校园集市 | `MARKET_PROVIDER=zanao`、`ZANAO_TOKEN`、`ZANAO_SCHOOL_ALIAS`、`ZANAO_SEARCH_CATEGORY_ID` | 建议放 `.env.market`；学校别名和分类必须与实际服务匹配，示例值不代表云南大学配置 |
 | 集市模型 | `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL` | Python 服务端配置；接口兼容不代表绑定某一家模型供应商 |
@@ -252,7 +252,18 @@ npm run dev
 .venv\Scripts\python.exe server/app.py
 ```
 
-默认监听 `http://127.0.0.1:8011`，健康检查为 `/api/health`。学期课程和课程给分已由主站精确转发；集市、充电和课表识别仍需对应网关规则。
+默认监听 `http://127.0.0.1:8011`，健康检查为 `/api/health`。学期课程、课程给分、集市、充电和课表识别均由开发入口转发至该服务。
+
+**校园 AI 代理：**
+
+```powershell
+npm run api:agent
+```
+
+默认监听 `http://127.0.0.1:8788`，可通过 `AGENT_PROXY_PORT` 设置；旧私有文件中的 `PORT=5173` 不再改变 AI 端口。进程环境中的 `PORT` 仍兼容部署脚本。开发入口和 AI 代理需分别启动；只启动 `npm run dev` 不会启动 AI 后端。
+
+在 `.env.local` 中设置服务端 `AGENT_ORIGIN`、`AGENT_APP_ID`、`AGENT_API_KEY`。浏览器默认采用代理模式，不配置任何凭据。
+旧配置迁移时，将 `VITE_AGENT_APP_ID`、`VITE_AGENT_API_KEY` 的值移至对应 `AGENT_` 变量，删除前端凭据变量及 `VITE_AGENT_ORIGIN`，将传输模式改为 `proxy`。已有服务端值优先，迁移前应核对其有效性。
 
 **教师 / 课程代理：**
 
@@ -272,6 +283,18 @@ Copy-Item vendor/dream-monitor/config.example.yaml vendor/dream-monitor/config.y
 ```
 
 默认监听 `http://127.0.0.1:8770`；在主站活动页面使用自己的账号登录。启动器也可通过 `npm run dev:dream-monitor` 调用，但需确保当前终端的 `python` 已安装对应依赖。详细数据目录、版本与部署说明见 [到梦空间接入文档](vendor/dream-monitor/ZHIHEY-INTEGRATION.md)。
+
+开发时分别启动前端和所需后端；前端统一从 `http://127.0.0.1:8000` 访问。
+
+| 后端 | 端口 | 开发与部署接口归属 |
+| --- | --- | --- |
+| Python 主服务 | 8011 | `/api/health`、`/api/config`、`/api/chat`、`/api/market/*`、`/api/term-courses`、`/api/course-grades/*`、`/api/charging/ports`、`/api/schedule/recognize` |
+| Node AI 代理 | 8788 | `/api/agent/*`，保留四个上游接口白名单 |
+| Node 课程代理 | 8787 | `/api/courses` |
+| 到梦空间 | 8770 | `/api/me`、`/api/login`、`/api/logout`、`/api/state`、`/api/refresh`、`/api/activity` |
+
+`/hiagent` 继续使用已有空教室代理。`TERM_COURSES_TARGET` 设置 Python 主服务目标，`AGENT_PROXY_TARGET` 和 `COURSE_API_TARGET` 分别设置两个 Node 服务目标。部署由 Nginx 提供相同的路由归属；不将开发代理配置视为静态部署的一部分。
+本次仍用于受控的封闭演示，不新增公共注册或统一认证。
 
 ### 6.4 校园集市独立联调
 

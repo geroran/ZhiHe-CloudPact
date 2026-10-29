@@ -18,18 +18,12 @@ function readViteEnv() {
     ? env.VITE_AGENT_TRANSPORT.trim()
     : '';
   const hasAnyConfig =
-    transport ||
-    env.VITE_AGENT_ORIGIN ||
-    env.VITE_AGENT_APP_ID ||
-    env.VITE_AGENT_API_KEY ||
-    env.VITE_AGENT_USER_ID;
+    transport || env.VITE_AGENT_USER_ID ||
+    env.VITE_AGENT_TIMEOUT_MS || env.VITE_AGENT_CONFIG_TIMEOUT_MS;
   if (!hasAnyConfig) return null;
 
   return {
-    transport: transport || 'direct',
-    origin: env.VITE_AGENT_ORIGIN,
-    appId: env.VITE_AGENT_APP_ID,
-    apiKey: env.VITE_AGENT_API_KEY,
+    transport: transport || 'proxy',
     userId: env.VITE_AGENT_USER_ID,
     timeoutMs: env.VITE_AGENT_TIMEOUT_MS,
     configTimeoutMs: env.VITE_AGENT_CONFIG_TIMEOUT_MS
@@ -42,47 +36,22 @@ function readViteEnv() {
  * 不在此处访问任何凭据文件。
  */
 export function readRuntimeConfig(win = globalThis.window) {
-  const raw = (win && win.__AGENT_CONFIG__) || readViteEnv();
+  const raw = (win && win.__AGENT_CONFIG__) || readViteEnv() || { transport: 'proxy' };
   if (!raw || typeof raw !== 'object') {
     return configError(
       'CONFIG_MISSING',
-      '运行配置未加载。请通过 npm run dev 启动，并在 .env.local 中配置 VITE_AGENT_* 变量。'
+      '运行配置无效，请检查代理配置。'
     );
   }
 
-  const transport = raw.transport === 'proxy' ? 'proxy' : raw.transport === 'direct' ? 'direct' : null;
+  const transport = !raw.transport || raw.transport === 'proxy' ? 'proxy' : null;
   if (!transport) {
-    return configError('CONFIG_INVALID', '运行配置中的 AGENT_TRANSPORT 无效，只支持 direct 或 proxy。');
+    return configError('CONFIG_INVALID', '浏览器仅支持 proxy 模式，请移除旧的 direct 配置。');
   }
 
   const userId = typeof raw.userId === 'string' ? raw.userId.trim() : '';
   const timeoutMs = positiveNumber(raw.timeoutMs, DEFAULT_TIMEOUT_MS);
   const configTimeoutMs = positiveNumber(raw.configTimeoutMs, DEFAULT_CONFIG_TIMEOUT_MS);
-
-  if (transport === 'direct') {
-    const origin = typeof raw.origin === 'string' ? raw.origin.trim().replace(/\/+$/, '') : '';
-    const appId = typeof raw.appId === 'string' ? raw.appId.trim() : '';
-    const apiKey = typeof raw.apiKey === 'string' ? raw.apiKey.trim() : '';
-    if (!origin || !appId || !apiKey) {
-      return configError(
-        'CONFIG_INCOMPLETE',
-        '浏览器直连模式缺少 VITE_AGENT_ORIGIN、VITE_AGENT_APP_ID 或 VITE_AGENT_API_KEY。'
-      );
-    }
-    return {
-      ok: true,
-      data: {
-        transport,
-        origin,
-        appId,
-        apiKey,
-        userId,
-        timeoutMs,
-        configTimeoutMs,
-        credentialsExposed: true
-      }
-    };
-  }
 
   return {
     ok: true,

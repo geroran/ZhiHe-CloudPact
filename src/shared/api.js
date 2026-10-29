@@ -11,22 +11,18 @@ function normalizeTimeout(value) {
 
 /**
  * 校园 AI 智能体客户端。
- * - direct：浏览器直连上游，Apikey 由 Vite 环境变量注入（仅限封闭演示）。
  * - proxy：浏览器只请求同源 `/api/agent/<endpoint>`，凭据保留在服务端。
  * 统一返回 { ok: true, data } / { ok: false, error }。
  * @param {object} config
  * @param {Function} [fetchImpl] 可注入的 fetch 实现，便于测试
  */
 export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
-  const transport = config.transport === 'proxy' ? 'proxy' : 'direct';
-  const origin = typeof config.origin === 'string' ? config.origin.replace(/\/+$/, '') : '';
-  const appId = typeof config.appId === 'string' ? config.appId.trim() : '';
-  const apiKey = typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+  const transport = 'proxy';
   const defaultTimeout = normalizeTimeout(config.timeoutMs);
 
   function mapStatus(status) {
     if (status === 401 || status === 403) {
-      return failure('UNAUTHORIZED', '智能体接口鉴权失败，请检查本地 Apikey 配置。');
+      return failure('UNAUTHORIZED', '智能体接口鉴权失败，请检查服务端配置。');
     }
     if (status === 429) {
       return failure('RATE_LIMITED', '智能体接口请求过于频繁，请稍后重试。', true);
@@ -41,9 +37,6 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
     const name = String(endpoint || '').replace(/^\/+/, '');
     if (!name) return failure('INVALID_ARGUMENT', '缺少智能体接口名称。');
 
-    if (transport === 'direct' && (!origin || !appId || !apiKey)) {
-      return failure('CONFIG_INCOMPLETE', '浏览器直连缺少 AGENT_ORIGIN、AGENT_APP_ID 或 AGENT_API_KEY。');
-    }
 
     const controller = new AbortController();
     const timeoutMs = normalizeTimeout(options.timeoutMs || defaultTimeout);
@@ -67,13 +60,7 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
     const body = options.body;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-    let url;
-    if (transport === 'direct') {
-      url = `${origin}/api/proxy/api/v1/${name}?appid=${encodeURIComponent(appId)}`;
-      headers.Apikey = apiKey;
-    } else {
-      url = `/api/agent/${name}`;
-    }
+    const url = `/api/agent/${name}`;
 
     try {
       const response = await fetchImpl(url, {
@@ -126,7 +113,7 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
     } catch (error) {
       if (externallyAborted) return failure('ABORTED', '请求已取消。');
       if (timedOut) return failure('TIMEOUT', '智能体响应超时，请稍后重试。', true);
-      return failure('NETWORK', '无法连接智能体服务：网络不可达，或浏览器跨域请求被拒绝。', true);
+      return failure('NETWORK', '无法连接智能体服务：请检查网络及代理服务。', true);
     } finally {
       clearTimeout(timer);
       if (externalSignal) externalSignal.removeEventListener('abort', onAbort);
@@ -140,9 +127,6 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
   async function stream(endpoint, options = {}) {
     const name = String(endpoint || '').replace(/^\/+/, '');
     if (!name) return failure('INVALID_ARGUMENT', '缺少智能体接口名称。');
-    if (transport === 'direct' && (!origin || !appId || !apiKey)) {
-      return failure('CONFIG_INCOMPLETE', '浏览器直连缺少 AGENT_ORIGIN、AGENT_APP_ID 或 AGENT_API_KEY。');
-    }
 
     const onText = options.onText;
     const controller = new AbortController();
@@ -168,16 +152,10 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
       'Content-Type': 'application/json',
       ...(options.headers || {})
     };
-    let url;
-    if (transport === 'direct') {
-      url = `${origin}/api/proxy/api/v1/${name}?appid=${encodeURIComponent(appId)}`;
-      headers.Apikey = apiKey;
-    } else {
-      url = `/api/agent/${name}`;
-    }
+    const url = `/api/agent/${name}`;
 
     try {
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(options.body === undefined ? {} : options.body),
@@ -225,7 +203,7 @@ export function createApiClient(config = {}, fetchImpl = globalThis.fetch) {
     } catch (error) {
       if (externallyAborted) return failure('ABORTED', '请求已取消。');
       if (timedOut) return failure('TIMEOUT', '智能体响应超时，请稍后重试。', true);
-      return failure('NETWORK', '无法连接智能体服务：网络不可达，或浏览器跨域请求被拒绝。', true);
+      return failure('NETWORK', '无法连接智能体服务：请检查网络及代理服务。', true);
     } finally {
       clearTimeout(timer);
       if (externalSignal) externalSignal.removeEventListener('abort', onAbort);

@@ -6,9 +6,12 @@
  *
  * 启动：npm run dev:market
  */
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
+import { assertFrontendEnv } from '../../scripts/frontend-env.mjs';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  assertFrontendEnv(loadEnv(mode, process.cwd(), ''));
+  return {
   server: {
     host: '127.0.0.1',
     port: 5300,
@@ -20,4 +23,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

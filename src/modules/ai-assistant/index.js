@@ -53,12 +53,12 @@ function writeStoredValue(key, value) {
 function explainError(error, config) {
   const code = error && error.code;
   if (code === 'NETWORK') {
-    return config.transport === 'direct'
-      ? '无法连接智能体服务：网络不可达，或浏览器跨域（CORS）请求被拒绝。请确认网络后重试，或在 .env.local 中切换 VITE_AGENT_TRANSPORT=proxy。'
-      : '无法连接本地代理服务，请确认 npm run dev 仍在运行。';
+    return '无法连接智能体服务，请稍后重试或联系演示管理员。';
   }
+  if (code === 'AGENT_PROXY_UNAVAILABLE') return 'AI 服务尚未启动，请联系演示管理员。';
+  if (code === 'CONFIG_ERROR') return '服务端尚未配置智能体，请联系演示管理员。';
   if (code === 'TIMEOUT') return '智能体响应超时，请稍后重试。';
-  if (code === 'UNAUTHORIZED') return '智能体接口鉴权失败，请检查本地 Apikey 配置。';
+  if (code === 'UNAUTHORIZED') return '智能体接口鉴权失败，请检查服务端配置。';
   if (code === 'ABORTED') return '请求已取消。';
   return (error && error.message) || '请求失败，请稍后重试。';
 }
@@ -106,15 +106,6 @@ export function mount(root, context = {}) {
     view.setComposerDisabled(true);
   } else {
     userId = userResult.data.userId;
-  }
-
-  if (config.transport === 'direct') {
-    view.setNotice(
-      '浏览器直连模式：AppID 与 Apikey 会出现在页面源码和浏览器开发者工具中，仅用于封闭演示环境，请勿公开部署。',
-      'warn'
-    );
-  } else {
-    view.setNotice('当前通过本地最小代理连接智能体，凭据只保留在服务端。', 'info');
   }
 
   conversationId = String(readStoredValue(CONVERSATION_KEY)).trim();

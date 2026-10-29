@@ -7,12 +7,13 @@ import { loadEnv } from './env.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const env = loadEnv({ root: ROOT });
 
-const transport = env.AGENT_TRANSPORT === 'proxy' ? 'proxy' : 'direct';
+const transport = 'proxy';
 const origin = String(env.AGENT_ORIGIN || 'https://agent.ynu.edu.cn').replace(/\/+$/, '');
 const appId = String(env.AGENT_APP_ID || '');
 const apiKey = String(env.AGENT_API_KEY || '');
 const host = env.HOST || '127.0.0.1';
-const port = Number(env.PORT || 5173);
+// 独立端口优先；仅兼容进程 PORT，忽略旧 .env.local 中的前端 PORT。
+const port = Number(env.AGENT_PROXY_PORT || process.env.PORT || 8788);
 const upstreamTimeoutMs = Number(env.AGENT_TIMEOUT_MS || 120000);
 
 const ALLOWED_ENDPOINTS = new Set([
@@ -62,17 +63,11 @@ function errorPayload(code, message, retryable) {
 function runtimeConfigScript() {
   const config = {
     transport,
-    credentialsExposed: transport === 'direct',
+    credentialsExposed: false,
     userId: env.AGENT_USER_ID || '',
     timeoutMs: Number(env.AGENT_TIMEOUT_MS || 120000),
     configTimeoutMs: Number(env.AGENT_CONFIG_TIMEOUT_MS || 15000)
   };
-  if (transport === 'direct') {
-    // 浏览器直连需要凭据；仅在用户明确接受的封闭演示环境使用。
-    config.origin = origin;
-    config.appId = appId;
-    config.apiKey = apiKey;
-  }
   const json = JSON.stringify(config).replace(/</g, '\\u003c');
   return `window.__AGENT_CONFIG__ = ${json};\n`;
 }
@@ -97,7 +92,7 @@ function readBody(req, limitBytes = 1024 * 1024) {
 
 function mapUpstreamStatus(statusCode) {
   if (statusCode === 401 || statusCode === 403) {
-    return errorPayload('UNAUTHORIZED', '智能体接口鉴权失败，请检查本地 Apikey 配置。', false);
+    return errorPayload('UNAUTHORIZED', '智能体接口鉴权失败，请检查服务端配置。', false);
   }
   if (statusCode === 404) {
     return errorPayload('NOT_FOUND', '智能体接口不存在（HTTP 404）。', false);
@@ -112,16 +107,12 @@ function mapUpstreamStatus(statusCode) {
 }
 
 async function handleAgentProxy(req, res, endpoint) {
-  if (transport !== 'proxy') {
-    sendJson(res, 404, errorPayload('NOT_FOUND', '当前为浏览器直连模式，本地代理未启用。', false));
-    return;
-  }
   if (!ALLOWED_ENDPOINTS.has(endpoint)) {
     sendJson(res, 404, errorPayload('NOT_FOUND', '该接口未纳入本地代理白名单。', false));
     return;
   }
   if (!appId || !apiKey) {
-    sendJson(res, 503, errorPayload('CONFIG_ERROR', '本地代理缺少 AGENT_APP_ID 或 AGENT_API_KEY。', false));
+    sendJson(res, 503, errorPayload('CONFIG_ERROR', '服务端尚未配置智能体。', false));
     return;
   }
   if (req.method !== 'POST') {
@@ -152,7 +143,8 @@ async function handleAgentProxy(req, res, endpoint) {
       },
       body,
       signal: controller.signal,
-      cache: 'no-store'
+      cache: 'no-store',
+      redirect: 'error'
     });
   } catch {
     clearTimeout(timer);
@@ -168,7 +160,8 @@ async function handleAgentProxy(req, res, endpoint) {
     return;
   }
 
-  clearTimeout(timer);
+  // 超时覆盖响应体读取和整个 SSE 流。
+  res.once('close', () => { clearTimeout(timer); controller.abort(); });
 
   if (!upstream.ok) {
     await upstream.text().catch(() => '');
@@ -193,9 +186,12 @@ async function handleAgentProxy(req, res, endpoint) {
         if (done) break;
         if (value) res.write(Buffer.from(value));
       }
-    } catch (error) {
+    } catch {
       console.warn(`[proxy] ${endpoint} stream aborted`);
+      res.destroy();
     } finally {
+      clearTimeout(timer);
+      await reader.cancel().catch(() => {});
       res.end();
     }
     return;
@@ -311,7 +307,4 @@ server.listen(port, host, () => {
   const actualPort = typeof address === 'object' && address ? address.port : port;
   console.log(`智启云聚本地服务：http://${host}:${actualPort}`);
   console.log(`智能体连接模式：${transport}`);
-  if (transport === 'direct') {
-    console.log('提示：direct 模式下 AppID/Apikey 会下发到浏览器，仅用于封闭演示。');
-  }
 });

@@ -7,8 +7,9 @@
 
 ## 构建与配置
 
-构建时设置 `VITE_AGENT_TRANSPORT=proxy`，并清空 `VITE_AGENT_APP_ID`、
-`VITE_AGENT_API_KEY`。前端无需持有智能体密钥，Node 代理从服务端读取凭据。
+构建时设置 `VITE_AGENT_TRANSPORT=proxy`，并删除 `VITE_AGENT_APP_ID`、
+`VITE_AGENT_API_KEY`。开发和构建入口会拒绝非空的前端凭据变量。前端无需持有智能体密钥，Node 代理从服务端读取凭据。
+本次保留四个后端，沿用封闭演示的受控访问环境。
 传输前检查构建产物，确认不包含本地配置中的密钥。
 
 仅上传 `dist/`、`server/`、`scripts/`、`vendor/dream-monitor/`、`deploy/`、
