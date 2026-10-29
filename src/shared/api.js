@@ -258,6 +258,18 @@ export function createSameOriginClient(base = '/api') {
 
         const payload = await response.json().catch(() => null);
         if (payload && typeof payload.ok === 'boolean') return payload;
+        // 空教室上游使用 success 信封；在主站请求层归一化后再交给模块。
+        if (payload && typeof payload.success === 'boolean') {
+          if (response.ok && payload.success) return { ok: true, data: payload.data };
+          const message = [payload.detail, payload.message].find(
+            (value) => typeof value === 'string' && value.trim()
+          );
+          return failure(
+            response.ok ? 'UPSTREAM_ERROR' : `HTTP_${response.status}`,
+            message || '空教室接口请求失败',
+            response.status >= 500
+          );
+        }
 
         return failure(
           response.ok ? 'BAD_RESPONSE' : `HTTP_${response.status}`,
