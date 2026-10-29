@@ -284,7 +284,7 @@ Copy-Item vendor/dream-monitor/config.example.yaml vendor/dream-monitor/config.y
 
 默认监听 `http://127.0.0.1:8770`；在主站活动页面使用自己的账号登录。启动器也可通过 `npm run dev:dream-monitor` 调用，但需确保当前终端的 `python` 已安装对应依赖。详细数据目录、版本与部署说明见 [到梦空间接入文档](vendor/dream-monitor/ZHIHEY-INTEGRATION.md)。
 
-开发时分别启动前端和所需后端；前端统一从 `http://127.0.0.1:8000` 访问。
+开发时分别启动前端和所需后端；后端未启动时，开发网关返回带服务启动提示的 JSON 错误（HTTP 502），不会自动启动对应服务。前端统一从 `http://127.0.0.1:8000` 访问。
 
 | 后端 | 端口 | 开发与部署接口归属 |
 | --- | --- | --- |

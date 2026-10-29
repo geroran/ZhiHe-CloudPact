@@ -9,7 +9,7 @@
 - `GET  /api/term-courses`（学期课程列表，经服务端代理，凭据不下发浏览器）
 - `POST /api/course-grades/search|info`（课程检索与历史给分统计，经服务端代理）
 
-启动：`python server/app.py`（默认读取 `.env` 与 APP_PORT，默认 8091）。
+启动：`python server/app.py`（读取 `.env.market`、`.env` 与进程 APP_PORT，默认 8011）。
 所有接口统一返回 `{ok:true,data}` / `{ok:false,error}`，并带 `Cache-Control: no-store`。
 """
 

@@ -43,11 +43,23 @@ test('开发网关将各业务请求送至对应后端', async () => {
       if (expected === 'dream') assert.match(response.headers.get('set-cookie'), /HttpOnly/);
     }
     // 后端退出时，网关应给出明确错误，而非 Vite 默认的空白 500。
-    upstreams[1].closeAllConnections();
-    await new Promise(resolve => upstreams[1].close(resolve));
-    const unavailable = await fetch(base + '/api/agent/get_app_config_preview', { method: 'POST' });
-    assert.equal(unavailable.status, 502);
-    assert.equal((await unavailable.json()).error.code, 'AGENT_PROXY_UNAVAILABLE');
+    for (const [index, paths, code] of [
+      [0, ['/api/config', '/api/term-courses', '/api/course-grades/search', '/api/market/posts'], 'MAIN_API_UNAVAILABLE'],
+      [1, ['/api/agent/get_app_config_preview'], 'AGENT_PROXY_UNAVAILABLE'],
+      [2, ['/api/courses'], 'COURSE_PROXY_UNAVAILABLE'],
+      [3, ['/api/me', '/api/login'], 'DREAM_PROXY_UNAVAILABLE'],
+    ]) {
+      upstreams[index].closeAllConnections();
+      await new Promise(resolve => upstreams[index].close(resolve));
+      for (const path of paths) {
+        const unavailable = await fetch(base + path);
+        assert.equal(unavailable.status, 502, path);
+        const payload = await unavailable.json();
+        assert.equal(payload.error.code, code, path);
+        assert.equal(payload.error.retryable, true);
+        assert.equal(JSON.stringify(payload).includes('ECONNREFUSED'), false);
+      }
+    }
     const nginx = await readFile(new URL('../deploy/nginx.locations.conf', import.meta.url), 'utf8');
     for (const port of [8011, 8788, 8787, 8770]) assert.ok(nginx.includes(`127.0.0.1:${port}`));
     assert.match(nginx, /proxy_buffering off/);

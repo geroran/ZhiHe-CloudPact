@@ -8,6 +8,7 @@
  */
 import { defineConfig, loadEnv } from 'vite';
 import { assertFrontendEnv } from '../../scripts/frontend-env.mjs';
+import { devProxy } from '../../scripts/dev-proxy.mjs';
 
 export default defineConfig(({ mode }) => {
   assertFrontendEnv(loadEnv(mode, process.cwd(), ''));
@@ -17,10 +18,7 @@ export default defineConfig(({ mode }) => {
     port: 5300,
     strictPort: true,
     proxy: {
-      '/api': {
-        target: process.env.MARKET_AGENT_API_TARGET || 'http://127.0.0.1:8011',
-        changeOrigin: true,
-      },
+      '/api': devProxy(process.env.MARKET_AGENT_API_TARGET || 'http://127.0.0.1:8011', 'MAIN_API_UNAVAILABLE', '主站服务未连接，请启动 npm run dev:server。'),
     },
   },
   };
