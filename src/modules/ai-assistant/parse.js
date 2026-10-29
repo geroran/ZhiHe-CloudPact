@@ -72,6 +72,27 @@ export function parseAppConfig(json) {
   };
 }
 
+/**
+ * 上游回答末尾会附带“您还可以询问这些相关问题”及一组推荐问题。
+ * 这些推荐问题已在首页展示，展示层去重时从正文中裁掉这一段。
+ * 只裁切独立成行、出现在正文最后的部分，避免误删正文中的正常提及。
+ */
+const SUGGESTED_QUESTIONS_LINE =
+  /^[ \t]*您(?:还|也)?可以(?:询问|问|了解)(?:这些|以下|一下|这个)?(?:的)?相关(?:的)?问题[^\n]*$/gm;
+
+export function stripSuggestedQuestions(text) {
+  const source = typeof text === 'string' ? text : '';
+  if (!source) return '';
+
+  let cutIndex = -1;
+  for (const match of source.matchAll(SUGGESTED_QUESTIONS_LINE)) {
+    cutIndex = match.index;
+  }
+  if (cutIndex < 0) return source.trim();
+
+  return source.slice(0, cutIndex).trim();
+}
+
 /** 解析 create_conversation 的 Conversation.AppConversationID。 */
 export function parseCreateConversation(json) {
   if (!isPlainObject(json) || !isPlainObject(json.Conversation)) {

@@ -78,11 +78,15 @@ export function mount(root, context = {}) {
   let messages = [];
   let lastFailedQuery = null;
   let userId = '';
+  let sendController = null;
+  let stoppedByUser = false;
 
   const view = createView(root, {
     onSend: handleSend,
     onSuggestion: handleSuggestion,
-    onNewConversation: handleNewConversation
+    onNewConversation: handleNewConversation,
+    onStop: handleStop,
+    onRegenerate: handleRegenerate
   });
 
   if (!config) {
@@ -216,6 +220,11 @@ export function mount(root, context = {}) {
   }
 
   function failRequest(query, error) {
+    // 用户主动停止时保留已收到的部分内容，不回填输入框、不弹错误。
+    if (stoppedByUser) {
+      view.setStatus('已停止生成');
+      return;
+    }
     lastFailedQuery = query;
     view.setInput(query);
     view.showError(
@@ -252,11 +261,18 @@ export function mount(root, context = {}) {
     view.renderMessages(messages, assistantName());
 
     busy = true;
+    stoppedByUser = false;
     view.setBusy(true);
+
+    const controller = new AbortController();
+    sendController = controller;
+    const reqSignal = controller.signal;
+    const abortFromDispose = () => controller.abort();
+    signal.addEventListener('abort', abortFromDispose);
 
     try {
       if (!conversationId) {
-        const created = await createConversation(api, userId, { signal });
+        const created = await createConversation(api, userId, { signal: reqSignal });
         if (disposed) return;
         if (!created.ok) {
           failRequest(query, created.error);
@@ -275,7 +291,7 @@ export function mount(root, context = {}) {
         query,
         userId,
         timeoutMs: config.timeoutMs,
-        signal,
+        signal: reqSignal,
         onEvent: ({ text }) => {
           if (disposed) return;
           assistant.text = text;
@@ -293,6 +309,16 @@ export function mount(root, context = {}) {
         return;
       }
 
+      // 用户点击“停止生成”：保留已到达的片段，不显示错误。
+      if (streamed.error && streamed.error.code === 'ABORTED' && stoppedByUser) {
+        const kept = assistant.text.trim();
+        assistant.streaming = false;
+        if (!kept) messages.pop();
+        view.renderMessages(messages, assistantName());
+        view.setStatus('已停止生成');
+        return;
+      }
+
       // 代理或上游未提供 SSE：退回 blocking 请求，保证功能可用。
       if (streamed.error && streamed.error.code === 'STREAM_UNSUPPORTED') {
         messages.pop();
@@ -302,7 +328,7 @@ export function mount(root, context = {}) {
           query,
           userId,
           timeoutMs: config.timeoutMs,
-          signal
+          signal: reqSignal
         });
         if (disposed) return;
 
@@ -330,6 +356,8 @@ export function mount(root, context = {}) {
       }
     } finally {
       cancelPendingRender();
+      signal.removeEventListener('abort', abortFromDispose);
+      if (sendController === controller) sendController = null;
       busy = false;
       if (!disposed) view.setBusy(false);
     }
@@ -337,6 +365,33 @@ export function mount(root, context = {}) {
 
   function handleSend(rawQuery) {
     void send(rawQuery, { appendUser: true });
+  }
+
+  function handleStop() {
+    if (!busy || !sendController) return;
+    stoppedByUser = true;
+    sendController.abort();
+    view.setStatus('已停止生成');
+  }
+
+  function handleRegenerate() {
+    if (busy || disposed || !userId) return;
+
+    let lastUserIndex = -1;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === 'user') {
+        lastUserIndex = index;
+        break;
+      }
+    }
+    if (lastUserIndex < 0) return;
+
+    const query = messages[lastUserIndex].text;
+    messages = messages.slice(0, lastUserIndex + 1);
+    lastFailedQuery = null;
+    view.clearError();
+    view.renderMessages(messages, assistantName());
+    void send(query, { appendUser: false });
   }
 
   function handleSuggestion(query) {
