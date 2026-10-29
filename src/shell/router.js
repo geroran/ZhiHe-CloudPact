@@ -8,6 +8,8 @@ import { renderPlaceholder } from './placeholder.js';
 const backIcon =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
 
+const WIDE_PAGES = new Set(['/course-grades', '/teacher-course-search', '/market-agent']);
+
 function currentPath() {
   const raw = location.hash.replace(/^#/, '');
   if (!raw) return '/';
@@ -77,6 +79,7 @@ export function createRouter({ root }) {
     if (token !== navToken) return;
 
     const path = currentPath();
+    root.dataset.layout = WIDE_PAGES.has(path) ? 'wide' : 'compact';
     window.scrollTo({ top: 0, behavior: 'auto' });
 
     if (path === '/') {

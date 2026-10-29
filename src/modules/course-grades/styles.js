@@ -16,7 +16,7 @@ export const COURSE_GRADES_STYLES = `
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: 0;
   color: var(--cg-text);
   font-size: 16px;
   line-height: 1.55;
@@ -27,6 +27,10 @@ export const COURSE_GRADES_STYLES = `
 .course-grades *::before,
 .course-grades *::after {
   box-sizing: border-box;
+}
+
+.course-grades [hidden] {
+  display: none !important;
 }
 
 .course-grades .cg {
@@ -72,7 +76,7 @@ export const COURSE_GRADES_STYLES = `
 
 .course-grades .cg__form {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: 12px 16px;
   padding: 16px;
@@ -216,7 +220,7 @@ export const COURSE_GRADES_STYLES = `
 
 .course-grades .cg__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 12px;
 }
 
@@ -401,11 +405,7 @@ export const COURSE_GRADES_STYLES = `
   }
 }
 
-@media (max-width: 720px) {
-  .course-grades {
-    padding: 16px 16px 32px;
-  }
-
+@container tool-page (max-width: 640px) {
   .course-grades .cg__header {
     flex-direction: column;
     align-items: flex-start;

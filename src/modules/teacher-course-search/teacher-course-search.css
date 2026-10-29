@@ -73,7 +73,7 @@
 
 .tcx-form {
   display: grid;
-  grid-template-columns: auto minmax(180px, 1fr) 150px auto;
+  grid-template-columns: max-content minmax(0, 1fr) 160px max-content;
   gap: 12px;
   align-items: end;
   padding: 18px;
@@ -98,6 +98,7 @@
 
 .tcx-field input {
   width: 100%;
+  min-width: 0;
   height: 42px;
   padding: 0 12px;
   border: 1px solid var(--tcx-border);
@@ -146,6 +147,7 @@
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
+  white-space: nowrap;
 }
 
 .tcx-segmented__item input:checked + span {
@@ -258,6 +260,8 @@
   flex-direction: column;
   gap: 5px;
   min-width: 140px;
+  max-width: 100%;
+  flex: 1 1 180px;
 }
 
 .tcx-filter__label {
@@ -266,6 +270,8 @@
 }
 
 .tcx-filter__select {
+  min-width: 0;
+  max-width: 100%;
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--tcx-border);
@@ -688,13 +694,12 @@
   }
 }
 
-@media (max-width: 900px) {
+@container tool-page (max-width: 900px) {
   .tcx-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tcx-field--mode,
-  .tcx-field--grow {
+  .tcx-field--mode {
     grid-column: 1 / -1;
   }
 
@@ -707,7 +712,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@container tool-page (max-width: 540px) {
   .tcx-hero {
     flex-direction: column;
     gap: 8px;

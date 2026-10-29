@@ -142,6 +142,29 @@ img {
   flex: 1;
   width: 100%;
   padding: 18px 16px 32px;
+  min-width: 0;
+}
+
+/* 工具页按实际可用宽度排版，首页及其他页面保留原有布局。 */
+#app[data-layout='wide'] .page__content {
+  container-type: inline-size;
+  container-name: tool-page;
+}
+
+@media (min-width: 768px) {
+  #app[data-layout='wide'] {
+    width: calc(100% - 48px);
+    max-width: 1320px;
+  }
+
+  #app[data-layout='wide'] .page__content {
+    padding: 28px 32px 40px;
+  }
+
+  #app[data-layout='wide'] .topbar {
+    padding-inline: 20px;
+    min-height: 60px;
+  }
 }
 
 /* 全局提示 */
