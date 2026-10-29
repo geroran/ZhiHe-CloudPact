@@ -50,7 +50,7 @@ function buildShell() {
     <header class="charging-map__header">
       <div class="charging-map__heading">
         <h2 class="charging-map__title" id="charging-map-title">桦苑电瓶车充电口导航</h2>
-        <p class="charging-map__subtitle">仅展示桦苑充电站 · 端口状态经本项目服务端代理实时查询</p>
+        <p class="charging-map__subtitle">仅展示桦苑充电站 · 端口状态实时查询</p>
       </div>
       <div class="charging-map__actions">
         <button type="button" class="charging-map__button charging-map__button--primary" data-refresh>刷新状态</button>
@@ -118,10 +118,9 @@ function buildShell() {
 /**
  * 挂载桦苑充电口导航。
  * @param {HTMLElement} root
- * @param {{apiBase?: string}} [context]
  * @returns {() => void} unmount
  */
-export function mount(root, context = {}) {
+export function mount(root) {
   if (!(root instanceof HTMLElement)) {
     throw new TypeError("charging-map: mount 需要一个 HTMLElement 根节点");
   }
@@ -211,7 +210,7 @@ export function mount(root, context = {}) {
       const failureText = failed > 0 ? `，其中 ${failed} 台设备查询失败（对应端口未知）` : "";
       const structureText = state.structureVerified ? "" : "，响应结构与已核对版本不一致";
       statusLine.textContent =
-        `状态更新于 ${formatTime(state.lastSuccessAt)}（服务器完成查询的时间）` +
+        `状态更新于 ${formatTime(state.lastSuccessAt)}（本次查询完成时间）` +
         `，已获取 ${state.successfulDevices}/${state.totalDevices} 台设备${failureText}${structureText}。`;
       return;
     }
@@ -238,8 +237,8 @@ export function mount(root, context = {}) {
 
     if (state.error) {
       const text = state.data
-        ? `刷新失败：${state.error.message}。已保留 ${formatTime(state.lastSuccessAt)} 的真实数据，端口状态未被清空。`
-        : `无法获取端口状态：${state.error.message}。`;
+        ? `刷新失败：${state.error.message}。已保留 ${formatTime(state.lastSuccessAt)} 的真实数据，端口状态未被清空。请关闭移动数据后重新打开，再尝试刷新。`
+        : `无法获取端口状态：${state.error.message}。请关闭移动数据后重新打开，再尝试刷新。`;
       const item = appendNoticeMessage(notice, "error", text);
       const retry = createElement("button", "charging-map__button charging-map__button--small", "重试");
       retry.type = "button";
@@ -252,7 +251,7 @@ export function mount(root, context = {}) {
       appendNoticeMessage(
         notice,
         "warning",
-        `${state.deviceErrors.size} 台设备查询失败（${describeDeviceErrors()}），对应端口显示为未知，未计入空闲。`,
+        `${state.deviceErrors.size} 台设备查询失败（${describeDeviceErrors()}），对应端口显示为未知，未计入空闲。请关闭移动数据后重新打开，再尝试刷新。`,
       );
       hasMessage = true;
     }
@@ -416,10 +415,7 @@ export function mount(root, context = {}) {
     state.currentAbort = controller;
 
     try {
-      const data = await fetchChargingData({
-        apiBase: context.apiBase,
-        signal: controller.signal,
-      });
+      const data = await fetchChargingData({ signal: controller.signal });
       if (disposed) return;
       applyData(data);
     } catch (error) {

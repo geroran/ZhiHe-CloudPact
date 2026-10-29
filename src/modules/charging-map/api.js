@@ -1,59 +1,31 @@
-/**
- * 充电口数据请求适配层。
- *
- * 始终请求同源后端代理 `/api/charging/ports`，绝不使用 `no-cors`。
- * 注意：宿主 shell 注入的 `context.api.request` 是校园 AI 智能体专用客户端
- * （固定 POST 到 `/api/agent/*`），不能复用于本模块，因此这里只走标准 fetch。
- *
- * `apiBase` 仅用于模块独立预览时指向本地服务端口。
- */
+/** 桦苑充电口由使用者的浏览器直接查询设备接口。 */
 
-export const CHARGING_ENDPOINT = "/api/charging/ports";
-export const DEFAULT_TIMEOUT_MS = 20000;
+import { inspectDevicePorts } from "./logic.js";
+
+export const CHARGING_ENDPOINT = "https://appapi.lvcchong.com/portDetail";
+export const DEFAULT_TIMEOUT_MS = 12000;
+const MAX_CONCURRENCY = 4;
+
+const SIM_IDS = [
+  "866522076351796", "865242053185643", "866569061877939",
+  "865242053215002", "867542058714729", "866569061879059",
+  "866569062039257", "865242053099711", "865242053188282",
+  "866569062057101",
+  "867542058886006", "867542058727622", "865242053143469",
+  "866569061326002", "866569061781370", "866569061925795",
+  "865242053166627", "867542058612907", "866522075090106",
+  "865242053201473", "866569061316128", "865242053196590",
+  "868065073992616", "865242053104859", "866569061319197",
+  "866569061549082", "866569061498363", "867542058727663",
+  "868662050970241", "868065073944765",
+];
 
 export class ChargingRequestError extends Error {
-  constructor(code, message, { retryable = true, cause } = {}) {
+  constructor(code, message, { cause } = {}) {
     super(message, cause ? { cause } : undefined);
     this.name = "ChargingRequestError";
     this.code = code;
-    this.retryable = retryable;
   }
-}
-
-function isAbortError(error) {
-  return error?.name === "AbortError";
-}
-
-function joinUrl(base, path) {
-  if (!base) return path;
-  return `${String(base).replace(/\/+$/, "")}${path}`;
-}
-
-function normalizeEnvelope(envelope) {
-  if (!envelope || typeof envelope !== "object") {
-    throw new ChargingRequestError("invalid_response", "代理返回了无法解析的数据");
-  }
-
-  if (envelope.ok !== true) {
-    const error = envelope.error || {};
-    throw new ChargingRequestError(
-      error.code || "charging_request_failed",
-      error.message || "充电口状态请求失败",
-      { retryable: error.retryable !== false },
-    );
-  }
-
-  const data = envelope.data;
-  if (
-    !data ||
-    typeof data !== "object" ||
-    typeof data.fetchedAt !== "string" ||
-    !Array.isArray(data.devices)
-  ) {
-    throw new ChargingRequestError("invalid_response", "代理响应缺少设备列表或刷新时间");
-  }
-
-  return data;
 }
 
 function createTimeoutSignal(externalSignal, timeoutMs) {
@@ -81,48 +53,110 @@ function createTimeoutSignal(externalSignal, timeoutMs) {
   };
 }
 
-/**
- * 获取一次完整的桦苑设备状态。
- * @param {{apiBase?: string, signal?: AbortSignal, timeoutMs?: number}} [options]
- * @returns {Promise<{fetchedAt: string, devices: Array<object>, summary: object}>}
- */
-export async function fetchChargingData({
-  apiBase = "",
-  signal: externalSignal,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-} = {}) {
+function failedDevice(deviceNo, code, message) {
+  return {
+    deviceNo,
+    ok: false,
+    name: null,
+    portNumber: null,
+    ports: null,
+    error: { code, message },
+  };
+}
+
+async function fetchDevice(simId, deviceNo, externalSignal, timeoutMs) {
   const timeout = createTimeoutSignal(externalSignal, timeoutMs);
 
   try {
-    let response;
-    try {
-      response = await fetch(joinUrl(apiBase, CHARGING_ENDPOINT), {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        signal: timeout.signal,
-        cache: "no-store",
-      });
-    } catch (error) {
-      if (timeout.didTimeOut()) {
-        throw new ChargingRequestError("timeout", "请求超时，未能获取充电口状态", { cause: error });
-      }
-      if (isAbortError(error) && externalSignal?.aborted) throw error;
-      throw new ChargingRequestError("network_error", "无法连接充电口状态代理服务", { cause: error });
+    const body = new URLSearchParams({
+      simId,
+      mapType: "2",
+      chargeTypeTag: "0",
+      appEntrance: "1",
+      version: "new",
+    });
+    const response = await fetch(CHARGING_ENDPOINT, {
+      method: "POST",
+      body,
+      signal: timeout.signal,
+    });
+
+    if (!response.ok) {
+      return failedDevice(deviceNo, "upstream_http", `接口返回 HTTP ${response.status}`);
     }
 
     let payload;
     try {
       payload = await response.json();
     } catch (error) {
-      throw new ChargingRequestError(
-        "invalid_response",
-        response.ok ? "代理返回了非 JSON 响应" : `代理请求失败（HTTP ${response.status}）`,
-        { retryable: response.ok, cause: error },
-      );
+      if (timeout.didTimeOut() || externalSignal?.aborted) throw error;
+      return failedDevice(deviceNo, "invalid_response", "接口返回内容无法解析");
+    }
+    if (payload?.code !== 200) {
+      return failedDevice(deviceNo, "upstream_business", "接口未返回有效状态");
     }
 
-    return normalizeEnvelope(payload);
+    const device = payload.data?.device;
+    const { valid, portNumber, ports } = inspectDevicePorts({
+      portNumber: device?.portNumber,
+      ports: payload.data?.ports,
+    });
+    if (!device || !Number.isInteger(device.portNumber) || !valid) {
+      return failedDevice(deviceNo, "invalid_response", "响应结构与已核对版本不一致");
+    }
+
+    return {
+      deviceNo,
+      ok: true,
+      name: typeof device.name === "string" ? device.name : "",
+      portNumber,
+      ports,
+      error: null,
+    };
+  } catch (error) {
+    if (externalSignal?.aborted) throw error;
+    if (timeout.didTimeOut()) {
+      return failedDevice(deviceNo, "timeout", "设备状态请求超时");
+    }
+    return failedDevice(deviceNo, "network_error", "设备状态请求失败");
   } finally {
     timeout.cleanup();
   }
+}
+
+/**
+ * 从当前浏览器按有限并发读取 30 台桦苑设备，保持原有页面所需的数据结构。
+ * @param {{signal?: AbortSignal, timeoutMs?: number}} [options]
+ */
+export async function fetchChargingData({
+  signal,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+} = {}) {
+  if (signal?.aborted) throw new DOMException("请求已取消", "AbortError");
+
+  const devices = new Array(SIM_IDS.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < SIM_IDS.length) {
+      const index = nextIndex++;
+      devices[index] = await fetchDevice(SIM_IDS[index], index + 1, signal, timeoutMs);
+    }
+  };
+
+  await Promise.all(Array.from({ length: MAX_CONCURRENCY }, () => worker()));
+
+  const succeeded = devices.filter((device) => device.ok).length;
+  if (succeeded === 0) {
+    throw new ChargingRequestError("charging_upstream_unavailable", "设备均未返回有效状态");
+  }
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    devices,
+    summary: {
+      total: devices.length,
+      succeeded,
+      failed: devices.length - succeeded,
+    },
+  };
 }
