@@ -78,7 +78,7 @@ export function parseAppConfig(json) {
  * 只裁切独立成行、出现在正文最后的部分，避免误删正文中的正常提及。
  */
 const SUGGESTED_QUESTIONS_LINE =
-  /^[ \t]*您(?:还|也)?可以(?:询问|问|了解)(?:这些|以下|一下|这个)?(?:的)?相关(?:的)?问题[^\n]*$/gm;
+  /^[ \t]*您(?:还|也)?可以(?:询问|问|了解)(?:这些|以下|一下|这个)?(?:的)?(?:相关(?:的)?)?问题[^\n]*$/gm;
 
 export function stripSuggestedQuestions(text) {
   const source = typeof text === 'string' ? text : '';
