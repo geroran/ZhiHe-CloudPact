@@ -21,6 +21,10 @@
 从 `config.example.yaml` 生成 `config.yaml`，设置 `notify: {}`、
 `api.auto_relogin: false`、`auto_signup.enabled: false`。
 
+当前锁文件包含本机链接的 Vite 开发依赖，服务器只安装运行依赖：
+`npm install --package-lock=false --ignore-scripts --omit=dev --no-audit --no-fund undici@8.12.3`。
+到梦空间启动命令显式指定 `--port 8770`，避免上游默认端口与已有应用冲突。
+
 ## 服务管理
 
 使用专用 `zhihe` 系统用户，将 `zhihe-yunqi@.service` 安装到
